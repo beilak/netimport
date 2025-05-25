@@ -1,0 +1,72 @@
+[project]
+name = "netimport"
+version = "0.0.2"
+description = "NetImport: Python Project Architecture Analyzer via Import Graphs"
+authors = [
+    {name = "Beilak Aliev beilak.aliev@gmail.com"}
+]
+license = "MIT"
+readme = "README.md"
+keywords = ["python", "architecture", "linter", "static analysis", "import graph", "dependencies", "visualization", "coupling", "cohesion"]
+requires-python = ">=3.9"
+dependencies = [
+    "toml (>=0.10.2,<0.11.0)",
+    "networkx (>=3.4.2,<4.0.0)",
+    "matplotlib (>=3.10.3,<4.0.0)",
+    "click (>=8.2.1,<9.0.0)",
+]
+dynamic = [ "classifiers" ]
+
+
+[project.scripts]
+netimport = "netimport_lib.cli:main"
+
+
+[project.urls]
+Homepage = "https://github.com/beilak/netimport"
+Repository = "https://github.com/beilak/netimport"
+
+
+[build-system]
+requires = ["poetry-core>=2.0.0,<3.0.0"]
+build-backend = "poetry.core.masonry.api"
+
+
+[tool.poetry]
+
+classifiers = [
+    "Development Status :: 3 - Alpha", # "4 - Beta", "5 - Production/Stable"
+    "Intended Audience :: Developers",
+    "License :: OSI Approved :: MIT License",
+    "Operating System :: OS Independent",
+    "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3.9",
+    "Programming Language :: Python :: 3.10",
+    "Programming Language :: Python :: 3.11",
+    "Programming Language :: Python :: 3.12",
+    "Topic :: Software Development :: Libraries :: Python Modules",
+    "Topic :: Software Development :: Quality Assurance",
+    "Topic :: Utilities",
+    "Environment :: Console",
+    "Typing :: Typed",
+]
+
+packages = [{include = "netimport_lib"}]
+
+
+
+
+
+
+[tool.poetry.group.dev.dependencies]
+mypy = "^1.15.0"
+ruff = "^0.11.11"
+
+[tool.netimport]
+ignored_dirs = ["venv", ".venv", "tests", "docs", "__pycache__", "node_modules", "migrations", ".git", ".hg"]
+gnored_files = ["setup.py", "manage.py"]
+# default_layout_algorithm = "spring"
+# exclude_std_lib_from_graph = false
+# exclude_external_libs_from_graph = false
+
+

@@ -1,28 +1,33 @@
 import networkx as nx
 import matplotlib.pyplot as plt
+import numpy as np
 
 FREEZ_RANDOM_SEED = 42
 
 
-def draw_graph(graph: nx.DiGraph):
+def draw_graph(graph: nx.DiGraph, layout):
     plt.figure(figsize=(18, 12))
 
     # ToDo inject type of resolving node position algo
-    # num_nodes = len(graph.nodes())
-    # optimal_k = 4.0 / np.sqrt(num_nodes) if num_nodes > 0 else 1.0
-    #
-    # pos = nx.spring_layout(
-    #     graph,
-    #     k=optimal_k,
-    #     iterations=500,
-    #     seed=FREEZ_RANDOM_SEED,
-    #     scale=2,
-    #     center=(0,0)
-    # )
+    # ToDo refact IF's
+    if layout == 'spring':
+        num_nodes = len(graph.nodes())
+        optimal_k = 4.0 / np.sqrt(num_nodes) if num_nodes > 0 else 1.0
+
+        pos = nx.spring_layout(
+            graph,
+            k=optimal_k,
+            iterations=500,
+            seed=FREEZ_RANDOM_SEED,
+            scale=2,
+            center=(0,0)
+        )
     # pos = nx.circular_layout(graph)
     # pos = nx.shell_layout(graph)
     # pos = nx.fruchterman_reingold_layout(graph)
-    pos = nx.planar_layout(graph)
+
+    if layout == "planar_layout":
+        pos = nx.planar_layout(graph)
 
     node_colors = []
     node_labels = {}

@@ -120,4 +120,4 @@ def main(
 
 
     print(dependency_graph.nodes)
-    draw_graph(dependency_graph)
+    draw_graph(dependency_graph, layout)

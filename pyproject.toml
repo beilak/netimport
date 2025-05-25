@@ -1,6 +1,6 @@
 [project]
 name = "netimport"
-version = "0.0.2"
+version = "0.0.3"
 description = "NetImport: Python Project Architecture Analyzer via Import Graphs"
 authors = [
     {name = "Beilak Aliev beilak.aliev@gmail.com"}

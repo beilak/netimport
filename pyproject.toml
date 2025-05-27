@@ -65,6 +65,9 @@ ruff = "^0.11.11"
 [tool.netimport]
 ignored_dirs = ["venv", ".venv", "tests", "docs", "__pycache__", "node_modules", "migrations", ".git", ".hg"]
 gnored_files = ["setup.py", "manage.py"]
+ignore_stdlib = true
+ignore_external_lib = true
+ignored_nodes = []
 # default_layout_algorithm = "spring"
 # exclude_std_lib_from_graph = false
 # exclude_external_libs_from_graph = false

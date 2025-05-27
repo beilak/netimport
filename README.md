@@ -23,6 +23,10 @@ NetImport is a static analysis tool for Python projects that helps developers vi
 ```bash
 pip install netimport
 ```
+or 
+```bash
+poetry add netimport
+```
 
 ## Usage
 

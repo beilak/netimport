@@ -1,5 +1,14 @@
 import os
+from typing import TypedDict
+
 import toml
+
+class NetImportConfigMap(TypedDict):
+    ignored_nodes: set[str]
+    ignored_dirs: set[str]
+    ignored_files: set[str]
+    ignore_stdlib: bool
+    ignore_external_lib: bool
 
 
 CONFIG_FILE_NAME = ".netimport.toml"
@@ -8,52 +17,42 @@ TOOL_SECTION_NAME = "tool"
 APP_CONFIG_SECTION_NAME = "netimport"
 
 
-def parse_config_object(app_config) -> dict[str, set[str]]:
-    ignored_dirs_list = app_config.get("ignored_dirs", [])
-    ignored_files_list = app_config.get("ignored_files", [])
-
-    if not isinstance(ignored_dirs_list, list) or not all(
-        isinstance(item, str) for item in ignored_dirs_list
-    ):
-        ignored_dirs_list = []
-
-    if not isinstance(ignored_files_list, list) or not all(
-        isinstance(item, str) for item in ignored_files_list
-    ):
-        ignored_files_list = []
-
-    config_data = {
-        "ignored_dirs": set(ignored_dirs_list),
-        "ignored_files": set(ignored_files_list),
-    }
+def parse_config_object(app_config) -> NetImportConfigMap:
+    config_data = NetImportConfigMap(
+        ignored_nodes=set(app_config.get("ignored_nodes", [])),
+        ignored_dirs=set(app_config.get("ignored_dirs", [])),
+        ignored_files=set(app_config.get("ignored_files", [])),
+        ignore_stdlib=app_config.get("ignore_stdlib", False),
+        ignore_external_lib=app_config.get("ignore_external_lib", False),
+    )
     # config_source_path = pyproject_path
     return config_data  # , config_source_path
 
 
 def load_config(
     project_root: str,
-) -> tuple[dict[str, set[str]] | None, str | None]:
+) -> NetImportConfigMap:
     config_data: dict[str, set[str]] | None = None
     config_source_path: str | None = None
 
-    # 1. .netimport.toml
-    custom_config_path = os.path.join(project_root, CONFIG_FILE_NAME)
-    if os.path.exists(custom_config_path):
-        with open(custom_config_path, "r", encoding="utf-8") as f:
-            data = toml.load(f)
-
-        app_config: dict | None = None
-        if APP_CONFIG_SECTION_NAME in data and isinstance(
-            data[APP_CONFIG_SECTION_NAME], dict
-        ):
-            app_config = data[APP_CONFIG_SECTION_NAME]
-        elif APP_CONFIG_SECTION_NAME not in data and (
-            "ignored_dirs" in data or "ignored_files" in data
-        ):
-            app_config = data
-
-        if app_config is not None:
-            return parse_config_object(app_config), custom_config_path
+    # # 1. .netimport.toml # ToDo
+    # custom_config_path = os.path.join(project_root, CONFIG_FILE_NAME)
+    # if os.path.exists(custom_config_path):
+    #     with open(custom_config_path, "r", encoding="utf-8") as f:
+    #         data = toml.load(f)
+    #
+    #     app_config: dict | None = None
+    #     if APP_CONFIG_SECTION_NAME in data and isinstance(
+    #         data[APP_CONFIG_SECTION_NAME], dict
+    #     ):
+    #         app_config = data[APP_CONFIG_SECTION_NAME]
+    #     elif APP_CONFIG_SECTION_NAME not in data and (
+    #         "ignored_dirs" in data or "ignored_files" in data
+    #     ):
+    #         app_config = data
+    #
+    #     if app_config is not None:
+    #         return parse_config_object(app_config)
 
     # 2. pyproject.toml
     pyproject_path = os.path.join(project_root, PYPROJECT_TOML_FILE)
@@ -69,6 +68,12 @@ def load_config(
             and isinstance(data[TOOL_SECTION_NAME][APP_CONFIG_SECTION_NAME], dict)
         ):
             app_config = data[TOOL_SECTION_NAME][APP_CONFIG_SECTION_NAME]
-            return parse_config_object(app_config), pyproject_path
+            return parse_config_object(app_config)
 
-    return None, None
+    return NetImportConfigMap(
+        ignored_modes=set(),
+        ignored_dirs=set(),
+        ignored_files=set(),
+        ignore_stdlib=False,
+        ignore_external_lib=False,
+    )

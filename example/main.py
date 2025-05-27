@@ -1,6 +1,10 @@
 import typing
 
+import networkx as nx
+
 from example.repo.account_repo import AccountRepository
+from example.repo.user_repo import UserRepository
+from example.service.user_creator import UserCreator
 from repo.account_repo import AccountRepository as RepoTest
 from example.service.account_creator import AccountCreator
 from service.account_creator import AccountCreator as AccountCreatorForTest
@@ -16,6 +20,11 @@ def main(welcome_text: AnyStr) -> None:
     print(AccountCreatorForTest)
     print(RepoTest)
     creator.new("Test")
+
+    user_creator = UserCreator(user_repository=UserRepository())
+    user_creator.new("test")
+
+    print(nx)
 
 
 if __name__ == "__main__":

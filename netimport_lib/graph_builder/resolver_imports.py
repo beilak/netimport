@@ -1,5 +1,6 @@
 import os
 import sys
+from typing import NamedTuple
 
 
 def get_standard_library_modules() -> set[str]:
@@ -66,13 +67,17 @@ def try_resolve_module_path(
 
     return None
 
+class NodeInfo(NamedTuple):
+    id: str | None
+    type: str
+
 
 def resolve_import_string(
     import_str: str,
     source_file_path_normalized: str,
     project_root: str,
     project_files_normalized: set[str],
-) -> tuple[str | None, str]:
+) -> NodeInfo:
     node_id: str | None = None
     node_type: str = "unresolved"
 
@@ -97,12 +102,12 @@ def resolve_import_string(
             if len(source_dir_parts) >= levels_to_go_up:
                 base_path_parts_relative = source_dir_parts[:-levels_to_go_up]
             else:
-                return (
+                return NodeInfo(
                     import_str,
                     "unresolved_relative_too_many_dots",
                 )
         else:
-            return import_str, "unresolved_relative_internal_error"
+            return NodeInfo(import_str, "unresolved_relative_internal_error")
 
         module_candidate_parts = temp_module_part.split(".")
 
@@ -117,14 +122,14 @@ def resolve_import_string(
             if resolved_path:
                 node_id = resolved_path
                 node_type = "project_file"
-                return node_id, node_type
+                return NodeInfo(node_id, node_type)
 
         if not temp_module_part:  # from . import * (or ..)
             potential_package_path = "/".join(base_path_parts_relative) + "/__init__.py"
             if potential_package_path in project_files_normalized:
                 return potential_package_path, "project_file"
 
-        return import_str, "unresolved_relative"
+        return NodeInfo(import_str, "unresolved_relative")
 
     # 2. absolute import
     absolute_module_parts = import_str.split(".")
@@ -142,16 +147,16 @@ def resolve_import_string(
         if resolved_path:
             node_id = resolved_path
             node_type = "project_file"
-            return node_id, node_type
+            return NodeInfo(node_id, node_type)
 
     root_module_name = absolute_module_parts[0]
     if root_module_name in STANDARD_LIB_MODULES:
         node_id = root_module_name
         node_type = "std_lib"
-        return node_id, node_type
+        return NodeInfo(node_id, node_type)
 
     node_id = root_module_name
 
     node_type = "external_lib"
-    return node_id, node_type
+    return NodeInfo(node_id, node_type)
 

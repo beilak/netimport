@@ -1,8 +1,14 @@
 import os
+from typing import Final, TypedDict
+
 import click
 import networkx as nx
 
-from netimport_lib.graph_builder.graph_builder import build_dependency_graph
+from netimport_lib.config_loader import load_config, NetImportConfigMap
+from netimport_lib.graph_builder.graph_builder import (
+    build_dependency_graph,
+    IgnoreConfigNode,
+)
 from netimport_lib.graph_draw import draw_graph
 from netimport_lib.imports_reader import get_imported_modules_as_strings
 from netimport_lib.project_file_reader import find_python_files
@@ -41,12 +47,12 @@ IGNORE_NODES: set = set()
     default='planar_layout',
     show_default=True,
 )
-@click.option(
-    "--ignored-dirs",
-    type=str,
-    default=None,
-    callback=lambda ctx, param, value: [d.strip() for d in value.split(',')] if value else None
-)
+# @click.option(
+#     "--ignored-dirs",
+#     type=str,
+#     default=None,
+#     callback=lambda ctx, param, value: [d.strip() for d in value.split(',')] if value else None
+# )
 @click.option(
     "--ignored-files",
     type=str,
@@ -69,47 +75,57 @@ def main(
     show_graph: bool,
     layout: str,
     config: str | None = None,
-    ignored_dirs: list[str] | None = None,
+    # ignored_dirs: set[str] | None = None,
     ignored_files: list[str] | None = None,
     show_console_summary: bool | None = False,
     export_dot: str | None = None,
     export_mermaid: str | None = None,
     include_type_checking: bool | None = False,
 ):
-
     # ToDo Not ready. Not all params used
 
-    ignored_dirs_tmp = {".venv"}
+
+    loaded_config: NetImportConfigMap = load_config(".")
+
+    # ignore_stdlib: Final[bool] = loaded_config.get("ignore_stdlib", False)
+
+
 
     file_imports_map: dict[str, list[str]] = {}
 
     py_files = find_python_files(
-        project_path, ignored_dirs=ignored_dirs_tmp, ignored_files=set()
+        project_path,
+        ignored_dirs=loaded_config["ignored_dirs"],
+        ignored_files=set(),
     )
-    for f_path in sorted(py_files):
-        print(os.path.relpath(f_path, project_path))
+    # for f_path in sorted(py_files):
+    #     print(os.path.relpath(f_path, project_path))
 
 
-    print("IMPORTS MAPS")
+    # print("IMPORTS MAPS")
 
     for f_path in sorted(py_files):
         # k = f"{project_path}/{os.path.relpath(f_path, project_path)}"
         file_imports_map[f_path] = get_imported_modules_as_strings(f_path)
 
-        print("----" * 10)
-        print(f_path)
-        print("Imports")
-        print(get_imported_modules_as_strings(f_path))
+        # print("----" * 10)
+        # print(f_path)
+        # print("Imports")
+        # print(get_imported_modules_as_strings(f_path))
 
     dependency_graph = build_dependency_graph(
         file_imports_map,
         project_path,
-        IGNORE_NODES,
+        ignore=IgnoreConfigNode(
+            nodes=loaded_config["ignored_nodes"],
+            stdlib=loaded_config["ignore_stdlib"],
+            external_lib=loaded_config["ignore_external_lib"],
+        ),
     )
 
     # Remove all isolated __init__.py
     isolated_nodes = list(nx.isolates(dependency_graph))
-    print(f"No depends nodes {isolated_nodes}")
+    # print(f"No depends nodes {isolated_nodes}")
     nodes_to_remove = []
     for node_id in isolated_nodes:
         node_attributes = dependency_graph.nodes[node_id]
@@ -119,5 +135,5 @@ def main(
         dependency_graph.remove_nodes_from(nodes_to_remove)
 
 
-    print(dependency_graph.nodes)
+    # print(dependency_graph.nodes)
     draw_graph(dependency_graph, layout)

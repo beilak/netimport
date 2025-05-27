@@ -1,6 +1,5 @@
 import typing
 import typing as tp
-from decimal import Decimal
 
 from example.domine.user import User
 

@@ -1,5 +1,5 @@
 import os
-from typing import TypedDict, NamedTuple
+from typing import TypedDict
 
 import networkx as nx
 
@@ -39,9 +39,7 @@ def build_dependency_graph(
 ) -> nx.DiGraph:
     graph = nx.DiGraph()
 
-    normalized_project_root = normalize_path(project_root)
-    # import pdb
-    # pdb.set_trace()
+    # normalized_project_root = normalize_path(project_root)
 
     project_files_normalized: set[str] = set() #set(file_imports_map.keys())
     for file_path_key in file_imports_map.keys():

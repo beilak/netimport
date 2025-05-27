@@ -32,8 +32,8 @@ def parse_config_object(app_config) -> NetImportConfigMap:
 def load_config(
     project_root: str,
 ) -> NetImportConfigMap:
-    config_data: dict[str, set[str]] | None = None
-    config_source_path: str | None = None
+    # config_data: dict[str, set[str]] | None = None
+    # config_source_path: str | None = None
 
     # # 1. .netimport.toml # ToDo
     # custom_config_path = os.path.join(project_root, CONFIG_FILE_NAME)

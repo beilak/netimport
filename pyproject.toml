@@ -1,19 +1,21 @@
 [project]
 name = "netimport"
-version = "0.0.4"
+version = "0.0.5"
 description = "NetImport: Python Project Architecture Analyzer via Import Graphs"
 authors = [
-    {name = "Beilak Aliev beilak.aliev@gmail.com"}
+    {name = "Beilak Aliev", email="beilak.aliev@gmail.com"}
 ]
 license = "MIT"
 readme = "README.md"
 keywords = ["python", "architecture", "linter", "static analysis", "import graph", "dependencies", "visualization", "coupling", "cohesion"]
-requires-python = ">=3.9"
+requires-python = ">=3.10"
 dependencies = [
     "toml (>=0.10.2,<0.11.0)",
     "networkx (>=3.4.2,<4.0.0)",
     "matplotlib (>=3.10.3,<4.0.0)",
     "click (>=8.2.1,<9.0.0)",
+    "plotly (>=6.1.2,<7.0.0)",
+    "bokeh (>=3.7.3,<4.0.0)",
 ]
 dynamic = [ "classifiers" ]
 
@@ -56,11 +58,10 @@ packages = [{include = "netimport_lib"}]
 
 
 
-
-
 [tool.poetry.group.dev.dependencies]
 mypy = "^1.15.0"
 ruff = "^0.11.11"
+
 
 [tool.netimport]
 ignored_dirs = ["venv", ".venv", "tests", "docs", "__pycache__", "node_modules", "migrations", ".git", ".hg"]

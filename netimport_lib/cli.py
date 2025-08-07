@@ -6,19 +6,17 @@ from netimport_lib.graph_builder.graph_builder import (
     build_dependency_graph,
     IgnoreConfigNode,
 )
-from netimport_lib.graph_draw import draw_graph
+from netimport_lib.graph_draw import draw_graph, draw_plotly_graph, draw_bokeh_graph
 from netimport_lib.imports_reader import get_imported_modules_as_strings
 from netimport_lib.project_file_reader import find_python_files
 
 IGNORE_NODES: set = set()
 # {
-    #"typing",
-    #"__init__.py",
-    #"dataclasses",
-    #"decimal",
+# "typing",
+# "__init__.py",
+# "dataclasses",
+# "decimal",
 # }
-
-
 
 
 @click.command()
@@ -28,20 +26,33 @@ IGNORE_NODES: set = set()
     # type=click.Path(exists=True, file_okay=False, dir_okay=True, readable=True, resolve_path=True)
 )
 @click.option(
-    "--output-graph", "-o",
+    "--output-graph",
+    "-o",
     type=click.Path(file_okay=True, dir_okay=False, writable=True, resolve_path=True),
     help="Save PNG file",
-    default=None
+    default=None,
 )
 @click.option(
-    "--show-graph/--no-show-graph", "-s/-ns",
-    default=False,
-    help="Show(Matplotlib)"
+    "--show-graph/--no-show-graph", "-s/-ns", default=False, help="Show(Matplotlib)"
 )
 @click.option(
     "--layout",
-    type=click.Choice(['planar_layout', 'spring', 'kamada_kawai', 'circular', 'spectral', 'shell', 'dot', 'neato', 'fdp', 'sfdp'], case_sensitive=False),
-    default='planar_layout',
+    type=click.Choice(
+        [
+            "planar_layout",
+            "spring",
+            "kamada_kawai",
+            "circular",
+            "spectral",
+            "shell",
+            "dot",
+            "neato",
+            "fdp",
+            "sfdp",
+        ],
+        case_sensitive=False,
+    ),
+    default="planar_layout",
     show_default=True,
 )
 # @click.option(
@@ -54,10 +65,13 @@ IGNORE_NODES: set = set()
     "--ignored-files",
     type=str,
     default=None,
-    callback=lambda ctx, param, value: [f.strip() for f in value.split(',')] if value else None
+    callback=lambda ctx, param, value: [f.strip() for f in value.split(",")]
+    if value
+    else None,
 )
 @click.option(
-    "--show-console-summary", "-cs",
+    "--show-console-summary",
+    "-cs",
     is_flag=True,
 )
 # @click.option(
@@ -81,12 +95,9 @@ def main(
 ):
     # ToDo Not ready. Not all params used
 
-
     loaded_config: NetImportConfigMap = load_config(".")
 
     # ignore_stdlib: Final[bool] = loaded_config.get("ignore_stdlib", False)
-
-
 
     file_imports_map: dict[str, list[str]] = {}
 
@@ -97,7 +108,6 @@ def main(
     )
     # for f_path in sorted(py_files):
     #     print(os.path.relpath(f_path, project_path))
-
 
     # print("IMPORTS MAPS")
 
@@ -131,6 +141,7 @@ def main(
     if nodes_to_remove:
         dependency_graph.remove_nodes_from(nodes_to_remove)
 
-
     # print(dependency_graph.nodes)
-    draw_graph(dependency_graph, layout)
+    # draw_graph(dependency_graph, layout)
+    # draw_plotly_graph(dependency_graph, layout)
+    draw_bokeh_graph(dependency_graph, layout)

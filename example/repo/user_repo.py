@@ -7,7 +7,6 @@ class UserRepository:
         self._some_obj = None
         print(os.name)
 
-
     def save(self, user: User) -> None:
         print(self._some_obj)
         print(user)

@@ -52,20 +52,24 @@ def try_resolve_module_path(
         return potential_package_path
 
     # 3. add root
-    potential_file_path = "/".join([project_root] + current_path_parts + module_path_parts) + ".py"
+    potential_file_path = (
+        "/".join([project_root] + current_path_parts + module_path_parts) + ".py"
+    )
     potential_file_path = normalize_path(potential_file_path)
     if potential_file_path in project_files_normalized:
         return potential_file_path
 
     # 4. add root
     potential_package_path = (
-        "/".join([project_root] + current_path_parts + module_path_parts) + "/__init__.py"
+        "/".join([project_root] + current_path_parts + module_path_parts)
+        + "/__init__.py"
     )
     potential_package_path = normalize_path(potential_package_path)
     if potential_package_path in project_files_normalized:
         return potential_package_path
 
     return None
+
 
 class NodeInfo(NamedTuple):
     id: str | None
@@ -81,7 +85,6 @@ def resolve_import_string(
     node_id: str | None = None
     node_type: str = "unresolved"
 
-
     source_parts = source_file_path_normalized.split("/")
     source_dir_parts = source_parts[:-1]
 
@@ -92,7 +95,6 @@ def resolve_import_string(
         while temp_module_part.startswith("."):
             num_dots += 1
             temp_module_part = temp_module_part[1:]
-
 
         base_path_parts_relative: list[str]
         if num_dots == 1:  # from .module import ...
@@ -159,4 +161,3 @@ def resolve_import_string(
 
     node_type = "external_lib"
     return NodeInfo(node_id, node_type)
-

@@ -17,5 +17,4 @@ class AccountCreator:
         new_account: typing.Final = Account(number=0, title="test", value=Decimal(0.0))
         self._account_repository.save(new_account)
 
-
         return new_account

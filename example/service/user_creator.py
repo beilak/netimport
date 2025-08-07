@@ -16,5 +16,4 @@ class UserCreator:
         new_user: typing.Final = User(name=name)
         self._user_repository.save(new_user)
 
-
         return new_user

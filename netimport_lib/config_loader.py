@@ -3,6 +3,7 @@ from typing import TypedDict
 
 import toml
 
+
 class NetImportConfigMap(TypedDict):
     ignored_nodes: set[str]
     ignored_dirs: set[str]

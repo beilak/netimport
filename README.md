@@ -82,7 +82,9 @@ Example .netimport.toml or pyproject.toml ([tool.netimport]):
 ```
 ignored_dirs = ["venv", ".venv", "tests", "docs", "__pycache__", "node_modules", "migrations"]
 ignored_files = ["setup.py", "manage.py"]
-
+ignore_stdlib = true
+ignore_external_lib = true
+ignored_nodes = []
 # Other planned or potential settings:
 # default_layout_algorithm = "spring"
 # exclude_std_lib_from_graph = false

@@ -3,7 +3,11 @@ from typing import TypedDict
 
 import networkx as nx
 
-from netimport_lib.graph_builder.resolver_imports import resolve_import_string, normalize_path, NodeInfo
+from netimport_lib.graph_builder.resolver_imports import (
+    resolve_import_string,
+    normalize_path,
+    NodeInfo,
+)
 
 
 class IgnoreConfigNode(TypedDict):
@@ -41,7 +45,7 @@ def build_dependency_graph(
 
     # normalized_project_root = normalize_path(project_root)
 
-    project_files_normalized: set[str] = set() #set(file_imports_map.keys())
+    project_files_normalized: set[str] = set()  # set(file_imports_map.keys())
     for file_path_key in file_imports_map.keys():
         project_files_normalized.add(normalize_path(file_path_key))
 

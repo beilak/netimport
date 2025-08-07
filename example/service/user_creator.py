@@ -9,7 +9,7 @@ class IUserRepository(tp.Protocol):
 
 
 class UserCreator:
-    def __init__(self, user_repository: IUserRepository):
+    def __init__(self, user_repository: IUserRepository) -> None:
         self._user_repository = user_repository
 
     def new(self, name: str) -> User:

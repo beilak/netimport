@@ -6,8 +6,7 @@ from typing import NamedTuple
 def get_standard_library_modules() -> set[str]:
     if hasattr(sys, "stdlib_module_names"):  # from Python 3.10
         return set(sys.stdlib_module_names)
-    else:
-        return set()
+    return set()
 
 
 STANDARD_LIB_MODULES = get_standard_library_modules()
@@ -33,7 +32,7 @@ def try_resolve_module_path(
     if base_path_parts_for_relative is not None:
         current_path_parts.extend(base_path_parts_for_relative)
 
-    # ToDo to meny if (fix it)
+    # TODO to meny if (fix it)
 
     # 1. try to find <path>/<modul>.py
     # example.service.account_creator -> example/service/account_creator.py
@@ -53,7 +52,7 @@ def try_resolve_module_path(
 
     # 3. add root
     potential_file_path = (
-        "/".join([project_root] + current_path_parts + module_path_parts) + ".py"
+        "/".join([project_root, *current_path_parts, *module_path_parts]) + ".py"
     )
     potential_file_path = normalize_path(potential_file_path)
     if potential_file_path in project_files_normalized:
@@ -61,7 +60,7 @@ def try_resolve_module_path(
 
     # 4. add root
     potential_package_path = (
-        "/".join([project_root] + current_path_parts + module_path_parts)
+        "/".join([project_root, *current_path_parts, *module_path_parts])
         + "/__init__.py"
     )
     potential_package_path = normalize_path(potential_package_path)

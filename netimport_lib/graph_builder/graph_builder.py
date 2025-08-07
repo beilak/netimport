@@ -22,17 +22,14 @@ def is_node_allow_to_add(node: NodeInfo, ignore: IgnoreConfigNode) -> bool:
     #
     #     pdb.set_trace()
 
-    # ToDo to many if
+    # TODO to many if
     if ignore["stdlib"] and node.type == "std_lib":
         return False
 
     if ignore["external_lib"] and node.type == "external_lib":
         return False
 
-    if node.id is None:
-        return False
-
-    return True
+    return node.id is not None
 
 
 def build_dependency_graph(
@@ -46,7 +43,7 @@ def build_dependency_graph(
     # normalized_project_root = normalize_path(project_root)
 
     project_files_normalized: set[str] = set()  # set(file_imports_map.keys())
-    for file_path_key in file_imports_map.keys():
+    for file_path_key in file_imports_map:
         project_files_normalized.add(normalize_path(file_path_key))
 
     # 1. Add project files as a Node
@@ -76,9 +73,6 @@ def build_dependency_graph(
                 project_files_normalized,
             )
             if target_node.id is None:
-                print(
-                    f"Can't get ID for import '{import_str}' from '{source_file_rel_path}'."
-                )
                 continue
 
             if not is_node_allow_to_add(target_node, ignore):
@@ -88,7 +82,7 @@ def build_dependency_graph(
             #     import pdb
             #     pdb.set_trace()
             #
-            # # ToDo to many if
+            # # TODO to many if
             # if ignore["stdlib"] and node_type == "std_lib":
             #     continue
             #
@@ -141,8 +135,7 @@ def get_display_folder_name(full_path, project_root_name):
 
         if len(relative_path_to_file) > 2:  # [my_app, subfolder, file.py]
             return relative_path_to_file[1]
-        else:
-            return project_root_name
+        return project_root_name
 
     except (ValueError, IndexError):
         return os.path.basename(os.path.dirname(str(full_path)))

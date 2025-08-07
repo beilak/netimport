@@ -19,7 +19,7 @@ APP_CONFIG_SECTION_NAME = "netimport"
 
 
 def parse_config_object(app_config) -> NetImportConfigMap:
-    config_data = NetImportConfigMap(
+    return NetImportConfigMap(
         ignored_nodes=set(app_config.get("ignored_nodes", [])),
         ignored_dirs=set(app_config.get("ignored_dirs", [])),
         ignored_files=set(app_config.get("ignored_files", [])),
@@ -27,7 +27,6 @@ def parse_config_object(app_config) -> NetImportConfigMap:
         ignore_external_lib=app_config.get("ignore_external_lib", False),
     )
     # config_source_path = pyproject_path
-    return config_data  # , config_source_path
 
 
 def load_config(
@@ -36,7 +35,7 @@ def load_config(
     # config_data: dict[str, set[str]] | None = None
     # config_source_path: str | None = None
 
-    # # 1. .netimport.toml # ToDo
+    # # 1. .netimport.toml # TODO
     # custom_config_path = os.path.join(project_root, CONFIG_FILE_NAME)
     # if os.path.exists(custom_config_path):
     #     with open(custom_config_path, "r", encoding="utf-8") as f:
@@ -59,7 +58,7 @@ def load_config(
     pyproject_path = os.path.join(project_root, PYPROJECT_TOML_FILE)
 
     if os.path.exists(pyproject_path):
-        with open(pyproject_path, "r", encoding="utf-8") as f:
+        with open(pyproject_path, encoding="utf-8") as f:
             data = toml.load(f)
 
         if (

@@ -18,13 +18,14 @@ from bokeh.models import (
 )
 from bokeh.plotting import figure, from_networkx, show
 
+
 FREEZ_RANDOM_SEED = 42
 
 
-# ToDo PointDrawTool не работает, надо чинить
+# TODO PointDrawTool не работает, надо чинить
 
 
-def draw_bokeh_graph(G: nx.DiGraph, layout):
+def draw_bokeh_graph(G: nx.DiGraph, layout) -> None:
     # 0. Ваша карта цветов
     color_map = {
         "project_file": "skyblue",
@@ -36,9 +37,6 @@ def draw_bokeh_graph(G: nx.DiGraph, layout):
     default_node_color = "red"
     # 2. Подготовка данных для Bokeh
     pos = nx.spring_layout(G, k=1.8, iterations=100, seed=FREEZ_RANDOM_SEED)
-    print("--- POS dictionary ---")
-    print(pos)
-    print("----------------------")
 
     node_ids_list = list(G.nodes())
     degrees = dict(G.degree())
@@ -87,10 +85,7 @@ def draw_bokeh_graph(G: nx.DiGraph, layout):
             or not node_data.get("x")
             or not node_data.get("y")
         ):
-            print(
-                "!!! Колонки 'x' и 'y' отсутствуют или пусты, добавляем/обновляем вручную !!!"
-            )
-            if "index" in node_data and node_data["index"]:
+            if node_data.get("index"):
                 ordered_node_ids_from_source = node_data["index"]
                 try:
                     node_xs = [
@@ -101,34 +96,25 @@ def draw_bokeh_graph(G: nx.DiGraph, layout):
                     ]
                     node_data_source.data["x"] = node_xs
                     node_data_source.data["y"] = node_ys
-                    print("Колонки 'x' и 'y' добавлены/обновлены по 'index'.")
-                except KeyError as e:
-                    print(
-                        f"!!! Ошибка KeyError при доступе к pos по ID из 'index': {e}. Проверьте соответствие ID."
-                    )
-                except Exception as e:
-                    print(f"!!! Другая ошибка при формировании x, y по 'index': {e}")
+                except KeyError:
+                    pass
+                except Exception:
+                    pass
             else:
-                print(
-                    "!!! Колонка 'index' отсутствует/пуста в data_source узлов. Не удалось добавить x,y."
-                )
+                pass
         # else:
         # print("Колонки 'x' и 'y' уже присутствуют и не пусты в data_source узлов.")
     else:
-        print(
-            "!!! Node renderer data source is None или пуст! Невозможно добавить x, y."
-        )
+        pass
     # --- КОНЕЦ ЯВНОГО ДОБАВЛЕНИЯ X и Y ---
 
-    print("--- Node Renderer Data Source (ПОСЛЕ возможного добавления x,y) ---")
     if (
         graph_renderer.node_renderer.data_source
         and graph_renderer.node_renderer.data_source.data
     ):
-        print(graph_renderer.node_renderer.data_source.data)
+        pass
     else:
-        print("Node renderer data source is None или пуст!")
-    print("-----------------------------------------------------------------")
+        pass
 
     # 4. Настройка отображения узлов
     main_node_glyph = graph_renderer.node_renderer.glyph
@@ -190,11 +176,8 @@ def draw_bokeh_graph(G: nx.DiGraph, layout):
                 point_draw_tool_instance.renderers = [graph_renderer.node_renderer]
             else:
                 point_draw_tool_instance.renderers.append(graph_renderer.node_renderer)
-            print("PointDrawTool настроен на node_renderer для перетаскивания.")
     else:
-        print(
-            "!!! PointDrawTool не найден. Убедитесь, что 'point_draw' есть в строке tools при создании figure."
-        )
+        pass
 
     # 6. Добавление меток узлов (LabelSet)
     labels = LabelSet(

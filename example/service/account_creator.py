@@ -10,11 +10,11 @@ class IAccountRepository(tp.Protocol):
 
 
 class AccountCreator:
-    def __init__(self, account_repository: IAccountRepository):
+    def __init__(self, account_repository: IAccountRepository) -> None:
         self._account_repository = account_repository
 
     def new(self, name: str) -> Account:
-        new_account: typing.Final = Account(number=0, title="test", value=Decimal(0.0))
+        new_account: typing.Final = Account(number=0, title="test", value=Decimal("0.0"))
         self._account_repository.save(new_account)
 
         return new_account

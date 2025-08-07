@@ -1,10 +1,11 @@
 import networkx as nx
 import plotly.graph_objects as go
 
+
 FREEZ_RANDOM_SEED = 42
 
 
-def draw_plotly_graph(graph: nx.DiGraph, layout):
+def draw_plotly_graph(graph: nx.DiGraph, layout) -> None:
     pos = nx.spring_layout(graph, k=0.5, iterations=50)  # Получаем позиции узлов
 
     edge_x = []
@@ -18,7 +19,7 @@ def draw_plotly_graph(graph: nx.DiGraph, layout):
     edge_trace = go.Scatter(
         x=edge_x,
         y=edge_y,
-        line=dict(width=0.5, color="#888"),
+        line={"width": 0.5, "color": "#888"},
         hoverinfo="none",
         mode="lines",
     )
@@ -40,20 +41,20 @@ def draw_plotly_graph(graph: nx.DiGraph, layout):
         hoverinfo="text",
         text=node_text,
         textposition="top center",
-        marker=dict(
-            showscale=False,  # Можно добавить цветовую шкалу, если узлы окрашены
+        marker={
+            "showscale": False,  # Можно добавить цветовую шкалу, если узлы окрашены
             # colorscale='YlGnBu',
-            reversescale=True,
-            color=[],  # здесь можно задать цвета для каждого узла
-            size=10,
+            "reversescale": True,
+            "color": [],  # здесь можно задать цвета для каждого узла
+            "size": 10,
             # colorbar=dict(
             #     thickness=15,
             #     title='Node Connections',
             #     xanchor='left',
             #     titleside='right'
             # ),
-            line_width=2,
-        ),
+            "line_width": 2,
+        },
     )
 
     fig = go.Figure(
@@ -63,10 +64,9 @@ def draw_plotly_graph(graph: nx.DiGraph, layout):
             font_size=16,
             showlegend=False,
             hovermode="closest",
-            margin=dict(b=20, l=5, r=5, t=40),
-            xaxis=dict(showgrid=False, zeroline=False, showticklabels=False),
-            yaxis=dict(showgrid=False, zeroline=False, showticklabels=False),
+            margin={"b": 20, "l": 5, "r": 5, "t": 40},
+            xaxis={"showgrid": False, "zeroline": False, "showticklabels": False},
+            yaxis={"showgrid": False, "zeroline": False, "showticklabels": False},
         ),
     )
     fig.show()
-    # fig.write_html("plotly_graph.html") # Для сохранения в файл

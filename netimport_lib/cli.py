@@ -10,6 +10,7 @@ from netimport_lib.imports_reader import get_imported_modules_as_strings
 from netimport_lib.project_file_reader import find_python_files
 from netimport_lib.visualizer import GRAPH_VISUALIZERS
 
+
 IGNORE_NODES: set = set()
 # {
 # "typing",
@@ -85,8 +86,8 @@ def main(
     export_mermaid: str | None = None,
     include_type_checking: bool | None = False,
     show_graph: str | None = "bokeh",
-):
-    # ToDo Not ready. Not all params used
+) -> None:
+    # TODO Not ready. Not all params used
 
     loaded_config: NetImportConfigMap = load_config(".")
 

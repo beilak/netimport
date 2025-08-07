@@ -74,3 +74,66 @@ ignored_nodes = []
 # exclude_external_libs_from_graph = false
 
 
+
+[tool.mypy]
+python_version = "3.12"
+warn_return_any = false
+warn_unused_configs = true
+ignore_missing_imports = true
+strict_optional = true
+allow_redefinition = true
+disallow_incomplete_defs = true
+plugins = []
+
+[mypy-alembic.versions]
+ignore_errors = true
+
+[tool.pytest.ini_options]
+asyncio_mode = "auto"
+addopts = "-x"
+
+
+[tool.ruff]
+exclude = [
+    ".git",
+    ".mypy_cache",
+    ".venv",
+    ".env",
+    ".pytest_cache",
+]
+fix = true
+unsafe-fixes = true
+show-fixes = true
+target-version = "py312"
+line-length = 120
+
+[tool.ruff.format]
+docstring-code-format = true
+
+[tool.ruff.lint.pydocstyle]
+convention = "google"
+
+[tool.ruff.lint]
+ignore = ["EM", "FBT", "PLR", "TRY003", "D1", "D203", "D213", "FA", "S311", "INP001", "RET501", "TC001", "TC002","TC003", "UP040", "ANN401", "ISC001", "COM812", "RUF001"]
+select = ["ALL"]
+
+[tool.ruff.lint.extend-per-file-ignores]
+"__init__.py" = ["F401", "F403"]
+"tests/*.py" = [
+    "ANN001",
+    "ANN002",
+    "ANN003",
+    "ANN401",
+    "S101",
+    "PLR2004",
+    "S311",
+]
+
+[tool.ruff.lint.flake8-bugbear]
+extend-immutable-calls = ["fastapi.Depends", "fastapi.params.Depends", "fastapi.Query", "fastapi.params.Query"]
+
+[tool.ruff.lint.isort]
+no-lines-before = ["standard-library", "local-folder"]
+known-third-party = []
+known-local-folder = []
+lines-after-imports = 2

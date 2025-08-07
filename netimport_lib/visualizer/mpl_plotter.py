@@ -2,14 +2,15 @@ import matplotlib.pyplot as plt
 import networkx as nx
 import numpy as np
 
+
 FREEZ_RANDOM_SEED = 42
 
 
-def draw_graph_mpl(graph: nx.DiGraph, layout):
+def draw_graph_mpl(graph: nx.DiGraph, layout) -> None:
     plt.figure(figsize=(18, 12))
 
-    # ToDo inject type of resolving node position algo
-    # ToDo refact IF's
+    # TODO inject type of resolving node position algo
+    # TODO refact IF's
     if layout == "spring":
         num_nodes = len(graph.nodes())
         optimal_k = 4.0 / np.sqrt(num_nodes) if num_nodes > 0 else 1.0
@@ -38,7 +39,7 @@ def draw_graph_mpl(graph: nx.DiGraph, layout):
         "unresolved": "lightgray",
         "unresolved_relative": "silver",
     }
-    min_node_size = 2500  # ToDo inject
+    min_node_size = 2500  # TODO inject
     node_size = [min_node_size + 2000 * graph.in_degree(n) for n in graph.nodes()]
 
     for node, data in graph.nodes(data=True):

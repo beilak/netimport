@@ -12,7 +12,7 @@ class ImportItem:
         lineno: int,
         col_offset: int,
         is_type_checking: bool = False,
-    ):
+    ) -> None:
         self.module_path = module_path
         self.name = name
         self.alias = alias
@@ -21,7 +21,7 @@ class ImportItem:
         self.col_offset = col_offset
         self.is_type_checking = is_type_checking
 
-    def __repr__(self):
+    def __repr__(self) -> str:
         return (
             f"ImportItem(module_path={self.module_path!r}, name={self.name!r}, "
             f"alias={self.alias!r}, level={self.level}, L{self.lineno}, "
@@ -30,15 +30,14 @@ class ImportItem:
 
     @property
     def full_imported_name(self) -> str:
-        """
-        return str for imported name
+        """Return str for imported name
         - "os" for `import os`
         - "package.module" for `import package.module`
         - "package.module.name" for `from package.module import name`
         - ".sibling" for `from . import sibling`
         - ".module.name" for `from .module import name`
         - "package" for `from package import *`
-        - "." for `from . import *`
+        - "." for `from . import *`.
         """
         prefix = "." * self.level
 
@@ -46,26 +45,25 @@ class ImportItem:
         if self.name and self.name != "*":
             if self.module_path:
                 return f"{prefix}{self.module_path}.{self.name}"
-            else:
-                return f"{prefix}{self.name}"
+            return f"{prefix}{self.name}"
 
         # Case 2: import module.path OR from module.path import *
-        elif self.module_path:  # e.g. "os", "package.module"
+        if self.module_path:  # e.g. "os", "package.module"
             return f"{prefix}{self.module_path}"
 
         # Case 3: from . import * (или from .. import *, и т.д.)
-        elif self.name == "*" and not self.module_path and self.level > 0:
+        if self.name == "*" and not self.module_path and self.level > 0:
             return prefix  # "." or ".."
 
         # Case 4 from . import (без имени и без *)
-        elif not self.module_path and not self.name and self.level > 0:
+        if not self.module_path and not self.name and self.level > 0:
             return prefix
 
         return ""
 
 
 class ImportVisitor(ast.NodeVisitor):
-    def __init__(self, file_path: str):
+    def __init__(self, file_path: str) -> None:
         self.file_path = file_path
         self.imports: list[ImportItem] = []
         self._in_type_checking_block = False
@@ -77,7 +75,7 @@ class ImportVisitor(ast.NodeVisitor):
         level: int,
         lineno: int,
         col_offset: int,
-    ):
+    ) -> None:
         for alias_node in node_names:
             imported_name = alias_node.name
             alias = alias_node.asname
@@ -104,7 +102,7 @@ class ImportVisitor(ast.NodeVisitor):
                 )
             )
 
-    def visit_Import(self, node: ast.Import):
+    def visit_Import(self, node: ast.Import) -> None:
         self._extract_imports(
             node.names,
             module_base=None,
@@ -114,7 +112,7 @@ class ImportVisitor(ast.NodeVisitor):
         )
         self.generic_visit(node)
 
-    def visit_ImportFrom(self, node: ast.ImportFrom):
+    def visit_ImportFrom(self, node: ast.ImportFrom) -> None:
         module_base = node.module if node.module else ""
         level = node.level
         self._extract_imports(
@@ -126,7 +124,7 @@ class ImportVisitor(ast.NodeVisitor):
         )
         self.generic_visit(node)
 
-    def visit_If(self, node: ast.If):
+    def visit_If(self, node: ast.If) -> None:
         is_type_checking_if = False
         # for if TYPE_CHECKING:
         if isinstance(node.test, ast.Name) and node.test.id == "TYPE_CHECKING":
@@ -163,7 +161,7 @@ def get_imported_modules_as_strings(
         return []
 
     try:
-        with open(file_path, "r", encoding="utf-8") as f:
+        with open(file_path, encoding="utf-8") as f:
             source_code = f.read()
 
         tree = ast.parse(source_code, filename=file_path)

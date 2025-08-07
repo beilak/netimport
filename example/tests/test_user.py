@@ -1,5 +1,5 @@
-from ..domine.user import User
+from example.domine.user import User
 
 
-def test_user():
+def test_user() -> None:
     assert User(name="test")

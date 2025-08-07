@@ -6,5 +6,4 @@ class AccountRepository:
         self._some_obj = None
 
     def save(self, account: Account) -> None:
-        print(self._some_obj)
-        print(account)
+        pass

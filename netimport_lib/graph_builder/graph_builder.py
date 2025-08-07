@@ -4,9 +4,9 @@ from typing import TypedDict
 import networkx as nx
 
 from netimport_lib.graph_builder.resolver_imports import (
-    resolve_import_string,
-    normalize_path,
     NodeInfo,
+    normalize_path,
+    resolve_import_string,
 )
 
 
@@ -37,7 +37,7 @@ def is_node_allow_to_add(node: NodeInfo, ignore: IgnoreConfigNode) -> bool:
 
 def build_dependency_graph(
     file_imports_map: dict[str, list[str]],
-    project_root: str,  # Absolute path to project root
+    project_root: str,
     ignore: IgnoreConfigNode,
     # ignore_nodes: set[str],
 ) -> nx.DiGraph:
@@ -119,4 +119,30 @@ def build_dependency_graph(
                     source_node_id, target_node.id, import_raw_string=import_str
                 )
 
+    for node_id in graph.nodes():
+        # folder_path = os.path.dirname(str(node_id))
+        # if not folder_path:
+        #     folder_path = "/"
+        # graph.nodes[node_id]["folder"] = folder_path
+
+        display_folder = get_display_folder_name(node_id, project_root)
+        graph.nodes[node_id]["folder"] = display_folder
+        graph.nodes[node_id]["is_root_folder"] = display_folder == project_root
+
     return graph
+
+
+def get_display_folder_name(full_path, project_root_name):
+    try:
+        path_parts = str(full_path).split(os.sep)
+        root_index = path_parts.index(project_root_name)
+
+        relative_path_to_file = path_parts[root_index:]
+
+        if len(relative_path_to_file) > 2:  # [my_app, subfolder, file.py]
+            return relative_path_to_file[1]
+        else:
+            return project_root_name
+
+    except (ValueError, IndexError):
+        return os.path.basename(os.path.dirname(str(full_path)))

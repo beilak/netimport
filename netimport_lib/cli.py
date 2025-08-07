@@ -1,14 +1,14 @@
 import click
 import networkx as nx
 
-from netimport_lib.config_loader import load_config, NetImportConfigMap
+from netimport_lib.config_loader import NetImportConfigMap, load_config
 from netimport_lib.graph_builder.graph_builder import (
-    build_dependency_graph,
     IgnoreConfigNode,
+    build_dependency_graph,
 )
-from netimport_lib.graph_draw import draw_graph, draw_plotly_graph, draw_bokeh_graph
 from netimport_lib.imports_reader import get_imported_modules_as_strings
 from netimport_lib.project_file_reader import find_python_files
+from netimport_lib.visualizer import GRAPH_VISUALIZERS
 
 IGNORE_NODES: set = set()
 # {
@@ -25,16 +25,13 @@ IGNORE_NODES: set = set()
     type=str,
     # type=click.Path(exists=True, file_okay=False, dir_okay=True, readable=True, resolve_path=True)
 )
-@click.option(
-    "--output-graph",
-    "-o",
-    type=click.Path(file_okay=True, dir_okay=False, writable=True, resolve_path=True),
-    help="Save PNG file",
-    default=None,
-)
-@click.option(
-    "--show-graph/--no-show-graph", "-s/-ns", default=False, help="Show(Matplotlib)"
-)
+# @click.option(
+#     "--output-graph",
+#     "-o",
+#     type=click.Path(file_okay=True, dir_okay=False, writable=True, resolve_path=True),
+#     help="Save PNG file",
+#     default=None,
+# )
 @click.option(
     "--layout",
     type=click.Choice(
@@ -55,20 +52,6 @@ IGNORE_NODES: set = set()
     default="planar_layout",
     show_default=True,
 )
-# @click.option(
-#     "--ignored-dirs",
-#     type=str,
-#     default=None,
-#     callback=lambda ctx, param, value: [d.strip() for d in value.split(',')] if value else None
-# )
-@click.option(
-    "--ignored-files",
-    type=str,
-    default=None,
-    callback=lambda ctx, param, value: [f.strip() for f in value.split(",")]
-    if value
-    else None,
-)
 @click.option(
     "--show-console-summary",
     "-cs",
@@ -80,10 +63,19 @@ IGNORE_NODES: set = set()
 #     help="Export DOT for Graphviz.",
 #     default=None
 # )
+
+@click.option(
+    "--show-graph",
+    type=click.Choice(
+        ["bokeh", "mpl"],
+        case_sensitive=False,
+    ),
+    default="bokeh",
+    show_default=True,
+)
 def main(
     project_path: str,
-    output_graph: str | None,
-    show_graph: bool,
+    # output_graph: str | None,
     layout: str,
     config: str | None = None,
     # ignored_dirs: set[str] | None = None,
@@ -92,6 +84,7 @@ def main(
     export_dot: str | None = None,
     export_mermaid: str | None = None,
     include_type_checking: bool | None = False,
+    show_graph: str | None = "bokeh",
 ):
     # ToDo Not ready. Not all params used
 
@@ -142,6 +135,7 @@ def main(
         dependency_graph.remove_nodes_from(nodes_to_remove)
 
     # print(dependency_graph.nodes)
-    # draw_graph(dependency_graph, layout)
     # draw_plotly_graph(dependency_graph, layout)
-    draw_bokeh_graph(dependency_graph, layout)
+
+    if show_graph and (visualizer := GRAPH_VISUALIZERS.get(show_graph)):
+        visualizer(dependency_graph, layout)

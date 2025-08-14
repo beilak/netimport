@@ -6,11 +6,10 @@ import numpy as np
 FREEZ_RANDOM_SEED = 42
 
 
-def draw_graph_mpl(graph: nx.DiGraph, layout) -> None:
+def draw_graph_mpl(graph: nx.DiGraph, layout: str) -> None:
     plt.figure(figsize=(18, 12))
 
-    # TODO inject type of resolving node position algo
-    # TODO refact IF's
+    pos = None
     if layout == "spring":
         num_nodes = len(graph.nodes())
         optimal_k = 4.0 / np.sqrt(num_nodes) if num_nodes > 0 else 1.0
@@ -23,12 +22,18 @@ def draw_graph_mpl(graph: nx.DiGraph, layout) -> None:
             scale=2,
             center=(0, 0),
         )
-    # pos = nx.circular_layout(graph)
-    # pos = nx.shell_layout(graph)
-    # pos = nx.fruchterman_reingold_layout(graph)
-
-    if layout == "planar_layout":
+    elif layout == "kamada_kawai":
+        pos = nx.kamada_kawai_layout(graph)
+    elif layout == "circular":
+        pos = nx.circular_layout(graph)
+    elif layout == "spectral":
+        pos = nx.spectral_layout(graph)
+    elif layout == "shell":
+        pos = nx.shell_layout(graph)
+    elif layout == "planar_layout":
         pos = nx.planar_layout(graph)
+    else:
+        pos = nx.spring_layout(graph)
 
     node_colors = []
     node_labels = {}
@@ -39,7 +44,7 @@ def draw_graph_mpl(graph: nx.DiGraph, layout) -> None:
         "unresolved": "lightgray",
         "unresolved_relative": "silver",
     }
-    min_node_size = 2500  # TODO inject
+    min_node_size = 2500
     node_size = [min_node_size + 2000 * graph.in_degree(n) for n in graph.nodes()]
 
     for node, data in graph.nodes(data=True):

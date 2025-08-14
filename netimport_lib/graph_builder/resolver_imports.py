@@ -1,10 +1,10 @@
-import os
 import sys
+from pathlib import Path
 from typing import NamedTuple
 
 
 def get_standard_library_modules() -> set[str]:
-    if hasattr(sys, "stdlib_module_names"):  # from Python 3.10
+    if hasattr(sys, "stdlib_module_names"):
         return set(sys.stdlib_module_names)
     return set()
 
@@ -13,12 +13,14 @@ STANDARD_LIB_MODULES = get_standard_library_modules()
 
 
 def normalize_path(path: str, project_root: str | None = None) -> str:
-    abs_path = os.path.abspath(path)
+    abs_path = Path(path).resolve()
     if project_root:
-        abs_project_root = os.path.abspath(project_root)
-        if abs_path.startswith(abs_project_root):
-            return os.path.relpath(abs_path, abs_project_root).replace(os.sep, "/")
-    return abs_path.replace(os.sep, "/")
+        abs_project_root = Path(project_root).resolve()
+        try:
+            return str(abs_path.relative_to(abs_project_root))
+        except ValueError:
+            pass
+    return str(abs_path)
 
 
 def try_resolve_module_path(
@@ -31,8 +33,6 @@ def try_resolve_module_path(
     current_path_parts = []
     if base_path_parts_for_relative is not None:
         current_path_parts.extend(base_path_parts_for_relative)
-
-    # TODO to meny if (fix it)
 
     # 1. try to find <path>/<modul>.py
     # example.service.account_creator -> example/service/account_creator.py
@@ -134,10 +134,6 @@ def resolve_import_string(
 
     # 2. absolute import
     absolute_module_parts = import_str.split(".")
-    # if import_str == "example.repo.account_repo.AccountRepository":
-    #     import pdb
-    #
-    #     pdb.set_trace()
     for i in range(len(absolute_module_parts), 0, -1):
         current_module_candidate_parts = absolute_module_parts[:i]
         resolved_path = try_resolve_module_path(

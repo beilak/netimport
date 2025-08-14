@@ -1,5 +1,5 @@
 import ast
-import os
+from pathlib import Path
 
 
 class ImportItem:
@@ -30,7 +30,8 @@ class ImportItem:
 
     @property
     def full_imported_name(self) -> str:
-        """Return str for imported name
+        """Return str for imported name.
+
         - "os" for `import os`
         - "package.module" for `import package.module`
         - "package.module.name" for `from package.module import name`
@@ -102,7 +103,7 @@ class ImportVisitor(ast.NodeVisitor):
                 )
             )
 
-    def visit_Import(self, node: ast.Import) -> None:
+    def visit_Import(self, node: ast.Import) -> None:  # noqa: N802
         self._extract_imports(
             node.names,
             module_base=None,
@@ -112,7 +113,7 @@ class ImportVisitor(ast.NodeVisitor):
         )
         self.generic_visit(node)
 
-    def visit_ImportFrom(self, node: ast.ImportFrom) -> None:
+    def visit_ImportFrom(self, node: ast.ImportFrom) -> None:  # noqa: N802
         module_base = node.module if node.module else ""
         level = node.level
         self._extract_imports(
@@ -124,7 +125,7 @@ class ImportVisitor(ast.NodeVisitor):
         )
         self.generic_visit(node)
 
-    def visit_If(self, node: ast.If) -> None:
+    def visit_If(self, node: ast.If) -> None:  # noqa: N802
         is_type_checking_if = False
         # for if TYPE_CHECKING:
         if isinstance(node.test, ast.Name) and node.test.id == "TYPE_CHECKING":
@@ -157,16 +158,17 @@ class ImportVisitor(ast.NodeVisitor):
 def get_imported_modules_as_strings(
     file_path: str, include_type_checking_imports: bool = False
 ) -> list[str]:
-    if not os.path.exists(file_path) or not os.path.isfile(file_path):
+    path = Path(file_path)
+    if not path.exists() or not path.is_file():
         return []
 
     try:
-        with open(file_path, encoding="utf-8") as f:
+        with path.open(encoding="utf-8") as f:
             source_code = f.read()
 
         tree = ast.parse(source_code, filename=file_path)
 
-    except Exception:
+    except SyntaxError:
         return []
 
     visitor = ImportVisitor(file_path)

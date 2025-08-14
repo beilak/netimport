@@ -1,20 +1,11 @@
 import networkx as nx
-
-# from bokeh.models import (
-#     Circle,
-#     MultiLine,
-#     NodesAndLinkedEdges,
-#     NodesAndLinkedNodes,
-#     HoverTool,
-#     LabelSet,
-# )
 from bokeh.models import (
     Circle,
     HoverTool,
     LabelSet,
     MultiLine,
     NodesAndLinkedEdges,
-    PointDrawTool,  # Инструмент для перетаскивания/редактирования точек
+    PointDrawTool,
 )
 from bokeh.plotting import figure, from_networkx, show
 
@@ -22,11 +13,7 @@ from bokeh.plotting import figure, from_networkx, show
 FREEZ_RANDOM_SEED = 42
 
 
-# TODO PointDrawTool не работает, надо чинить
-
-
-def draw_bokeh_graph(G: nx.DiGraph, layout) -> None:
-    # 0. Ваша карта цветов
+def draw_bokeh_graph(graph: nx.DiGraph, layout: str) -> None:
     color_map = {
         "project_file": "skyblue",
         "std_lib": "lightgreen",
@@ -35,46 +22,41 @@ def draw_bokeh_graph(G: nx.DiGraph, layout) -> None:
         "unresolved_relative": "silver",
     }
     default_node_color = "red"
-    # 2. Подготовка данных для Bokeh
-    pos = nx.spring_layout(G, k=1.8, iterations=100, seed=FREEZ_RANDOM_SEED)
+    pos = nx.spring_layout(graph, k=1.8, iterations=100, seed=FREEZ_RANDOM_SEED)
 
-    node_ids_list = list(G.nodes())
-    degrees = dict(G.degree())
+    node_ids_list = list(graph.nodes())
+    degrees = dict(graph.degree())
     min_node_size_constant = 20
     label_padding = 20
 
     for node_id in node_ids_list:
-        node_original_data = G.nodes[node_id]
+        node_original_data = graph.nodes[node_id]
         current_degree = degrees.get(node_id, 0)
         calculated_size = min_node_size_constant + current_degree * 10
         calculated_radius_screen = calculated_size / 2.0
 
-        G.nodes[node_id]["viz_size"] = calculated_size
-        G.nodes[node_id]["viz_radius_screen"] = calculated_radius_screen
-        G.nodes[node_id]["viz_color"] = color_map.get(
+        graph.nodes[node_id]["viz_size"] = calculated_size
+        graph.nodes[node_id]["viz_radius_screen"] = calculated_radius_screen
+        graph.nodes[node_id]["viz_color"] = color_map.get(
             node_original_data.get("type", "unresolved"), default_node_color
         )
-        G.nodes[node_id]["viz_label"] = node_original_data.get("label", str(node_id))
-        G.nodes[node_id]["viz_degree"] = current_degree
-        G.nodes[node_id]["viz_type"] = node_original_data.get("type", "unresolved")
-        G.nodes[node_id]["viz_label_y_offset"] = (
+        graph.nodes[node_id]["viz_label"] = node_original_data.get("label", str(node_id))
+        graph.nodes[node_id]["viz_degree"] = current_degree
+        graph.nodes[node_id]["viz_type"] = node_original_data.get("type", "unresolved")
+        graph.nodes[node_id]["viz_label_y_offset"] = (
             calculated_radius_screen + label_padding
         )
 
-    # 3. Создание фигуры Bokeh
-    # Добавляем 'point_draw' в список инструментов по умолчанию
-    # Сделайте так:
-
     plot = figure(
-        title="Интерактивный граф с перетаскиванием узлов",
+        title="Interactive graph with draggable nodes",
         sizing_mode="scale_both",
-        tools="pan,wheel_zoom,box_zoom,reset,save,tap,hover,point_draw",  # 'point_draw' добавлен
-        active_drag="pan",  # 'pan' активен для перетаскивания по умолчанию
-        active_inspect="hover",  # 'hover' активен для инспекции по умолчанию
-        output_backend="webgl",  # Включаем аппаратное ускорение
+        tools="pan,wheel_zoom,box_zoom,reset,save,tap,hover,point_draw",
+        active_drag="pan",
+        active_inspect="hover",
+        output_backend="webgl",
     )
 
-    graph_renderer = from_networkx(G, pos, scale=1, center=(0, 0))
+    graph_renderer = from_networkx(graph, pos, scale=1, center=(0, 0))
 
     node_data_source = graph_renderer.node_renderer.data_source
     if node_data_source and node_data_source.data:
@@ -84,39 +66,22 @@ def draw_bokeh_graph(G: nx.DiGraph, layout) -> None:
             or "y" not in node_data
             or not node_data.get("x")
             or not node_data.get("y")
-        ):
-            if node_data.get("index"):
-                ordered_node_ids_from_source = node_data["index"]
-                try:
-                    node_xs = [
-                        pos[node_id][0] for node_id in ordered_node_ids_from_source
-                    ]
-                    node_ys = [
-                        pos[node_id][1] for node_id in ordered_node_ids_from_source
-                    ]
-                    node_data_source.data["x"] = node_xs
-                    node_data_source.data["y"] = node_ys
-                except KeyError:
-                    pass
-                except Exception:
-                    pass
-            else:
+        ) and node_data.get("index"):
+            ordered_node_ids_from_source = node_data["index"]
+            try:
+                node_xs = [
+                    pos[node_id][0] for node_id in ordered_node_ids_from_source
+                ]
+                node_ys = [
+                    pos[node_id][1] for node_id in ordered_node_ids_from_source
+                ]
+                node_data_source.data["x"] = node_xs
+                node_data_source.data["y"] = node_ys
+            except KeyError:
                 pass
-        # else:
-        # print("Колонки 'x' и 'y' уже присутствуют и не пусты в data_source узлов.")
-    else:
-        pass
-    # --- КОНЕЦ ЯВНОГО ДОБАВЛЕНИЯ X и Y ---
+            except Exception:
+                pass
 
-    if (
-        graph_renderer.node_renderer.data_source
-        and graph_renderer.node_renderer.data_source.data
-    ):
-        pass
-    else:
-        pass
-
-    # 4. Настройка отображения узлов
     main_node_glyph = graph_renderer.node_renderer.glyph
     main_node_glyph.size = "viz_size"
     main_node_glyph.fill_color = "viz_color"
@@ -155,7 +120,6 @@ def draw_bokeh_graph(G: nx.DiGraph, layout) -> None:
         sel_glyph.fill_color = "firebrick"
         sel_glyph.line_width = 2
 
-    # 5. Настройка отображения ребер
     graph_renderer.edge_renderer.glyph = MultiLine(
         line_color="#CCCCCC", line_alpha=0.8, line_width=1
     )
@@ -167,19 +131,15 @@ def draw_bokeh_graph(G: nx.DiGraph, layout) -> None:
     )
 
     point_draw_tool_instance = plot.select_one(PointDrawTool)
-    if point_draw_tool_instance:
-        if (
-            not point_draw_tool_instance.renderers
-            or graph_renderer.node_renderer not in point_draw_tool_instance.renderers
-        ):
-            if not point_draw_tool_instance.renderers:
-                point_draw_tool_instance.renderers = [graph_renderer.node_renderer]
-            else:
-                point_draw_tool_instance.renderers.append(graph_renderer.node_renderer)
-    else:
-        pass
+    if point_draw_tool_instance and (
+        not point_draw_tool_instance.renderers
+        or graph_renderer.node_renderer not in point_draw_tool_instance.renderers
+    ):
+        if not point_draw_tool_instance.renderers:
+            point_draw_tool_instance.renderers = [graph_renderer.node_renderer]
+        else:
+            point_draw_tool_instance.renderers.append(graph_renderer.node_renderer)
 
-    # 6. Добавление меток узлов (LabelSet)
     labels = LabelSet(
         x="x",
         y="y",
@@ -195,17 +155,12 @@ def draw_bokeh_graph(G: nx.DiGraph, layout) -> None:
     )
     plot.add_layout(labels)
 
-    # 7. Добавление/настройка других инструментов интерактивности
-    # Политики для TapTool и HoverTool
     graph_renderer.selection_policy = NodesAndLinkedEdges()
     graph_renderer.inspection_policy = NodesAndLinkedEdges()
 
-    # HoverTool уже добавлен в `tools="...,hover,..."`
     hover_tool_instance = plot.select_one(HoverTool)
     if hover_tool_instance:
-        hover_tool_instance.renderers = [
-            graph_renderer.node_renderer
-        ]  # Явно указываем рендерер
+        hover_tool_instance.renderers = [graph_renderer.node_renderer]
         hover_tool_instance.tooltips = [
             ("Name", "@viz_label"),
             ("Type", "@viz_type"),
@@ -213,9 +168,7 @@ def draw_bokeh_graph(G: nx.DiGraph, layout) -> None:
             ("ID", "@index"),
             ("Folder", "@folder"),
         ]
-    # TapTool также уже добавлен
 
     plot.renderers.append(graph_renderer)
 
-    # 8. Отображение
     show(plot)

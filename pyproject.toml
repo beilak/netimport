@@ -61,11 +61,12 @@ packages = [{include = "netimport_lib"}]
 [tool.poetry.group.dev.dependencies]
 mypy = "^1.15.0"
 ruff = "^0.11.11"
+pytest = "^8.4.1"
 
 
 [tool.netimport]
 ignored_dirs = ["venv", ".venv", "tests", "docs", "__pycache__", "node_modules", "migrations", ".git", ".hg"]
-gnored_files = ["setup.py", "manage.py"]
+ignored_files = ["setup.py", "manage.py"]
 ignore_stdlib = true
 ignore_external_lib = true
 ignored_nodes = []
@@ -89,7 +90,6 @@ plugins = []
 ignore_errors = true
 
 [tool.pytest.ini_options]
-asyncio_mode = "auto"
 addopts = "-x"
 
 

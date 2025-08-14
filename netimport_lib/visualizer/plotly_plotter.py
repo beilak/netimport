@@ -5,15 +5,15 @@ import plotly.graph_objects as go
 FREEZ_RANDOM_SEED = 42
 
 
-def draw_plotly_graph(graph: nx.DiGraph, layout) -> None:
-    pos = nx.spring_layout(graph, k=0.5, iterations=50)  # Получаем позиции узлов
+def draw_plotly_graph(graph: nx.DiGraph, layout: str) -> None:
+    pos = nx.spring_layout(graph, k=0.5, iterations=50)
 
     edge_x = []
     edge_y = []
     for edge in graph.edges():
         x0, y0 = pos[edge[0]]
         x1, y1 = pos[edge[1]]
-        edge_x.extend([x0, x1, None])  # None для разрыва линии
+        edge_x.extend([x0, x1, None])
         edge_y.extend([y0, y1, None])
 
     edge_trace = go.Scatter(
@@ -37,22 +37,15 @@ def draw_plotly_graph(graph: nx.DiGraph, layout) -> None:
     node_trace = go.Scatter(
         x=node_x,
         y=node_y,
-        mode="markers+text",  # Отображать и маркеры, и текст
+        mode="markers+text",
         hoverinfo="text",
         text=node_text,
         textposition="top center",
         marker={
-            "showscale": False,  # Можно добавить цветовую шкалу, если узлы окрашены
-            # colorscale='YlGnBu',
+            "showscale": False,
             "reversescale": True,
-            "color": [],  # здесь можно задать цвета для каждого узла
+            "color": [],
             "size": 10,
-            # colorbar=dict(
-            #     thickness=15,
-            #     title='Node Connections',
-            #     xanchor='left',
-            #     titleside='right'
-            # ),
             "line_width": 2,
         },
     )
@@ -60,7 +53,7 @@ def draw_plotly_graph(graph: nx.DiGraph, layout) -> None:
     fig = go.Figure(
         data=[edge_trace, node_trace],
         layout=go.Layout(
-            title="<br>Интерактивный граф на Plotly",
+            title="<br>Interactive graph with Plotly",
             font_size=16,
             showlegend=False,
             hovermode="closest",

@@ -23,50 +23,52 @@ def create_constrained_layout(
     folder_to_nodes = defaultdict(list)
     root_folder_nodes = []
     for node, data in graph.nodes(data=True):
-        if data["is_root_folder"]:
+        if data.get("is_root_folder"):
             root_folder_nodes.append(node)
         else:
             folder_to_nodes[data["folder"]].append(node)
 
-    unique_folders = list(folder_to_nodes.keys())
-
     folder_graph = nx.Graph()
-    folder_graph.add_nodes_from(unique_folders)
+    all_folders = list(folder_to_nodes.keys())
+    for folder in all_folders:
+        folder_graph.add_node(folder, label=folder.split("/")[-1])
+        parent_folder = "/".join(folder.split("/")[:-1])
+        if parent_folder in all_folders:
+            folder_graph.add_edge(parent_folder, folder)
 
     folder_pos = nx.spring_layout(
         folder_graph,
         k=folder_layout_k,
         iterations=100,
         seed=FREEZ_RANDOM_SEED,
-        scale=10,
+        scale=20,
     )
 
     final_pos = {}
-
     for folder_name, nodes_in_folder in folder_to_nodes.items():
         subgraph = graph.subgraph(nodes_in_folder)
-
         local_pos = nx.spring_layout(
-            subgraph, k=node_layout_k, iterations=50, seed=FREEZ_RANDOM_SEED
+            subgraph, k=node_layout_k, iterations=50, seed=FREEZ_RANDOM_SEED, scale=1
         )
 
         folder_center_x, folder_center_y = folder_pos[folder_name]
-
-        min_x, max_x = float("inf"), float("-inf")
-        min_y, max_y = float("inf"), float("-inf")
-
         for node, (x, y) in local_pos.items():
-            global_x = x + folder_center_x
-            global_y = y + folder_center_y
-            final_pos[node] = (global_x, global_y)
+            final_pos[node] = (x + folder_center_x, y + folder_center_y)
 
-            min_x, max_x = min(min_x, global_x), max(max_x, global_x)
-            min_y, max_y = min(min_y, global_y), max(max_y, global_y)
-
-    padding = 0.5
+    padding = 1.0
     folder_rect_data = defaultdict(list)
-    for folder_name, nodes in folder_to_nodes.items():
-        coords = [final_pos[n] for n in nodes]
+
+    sorted_folders = sorted(list(folder_to_nodes.keys()), key=lambda x: x.count("/"), reverse=True)
+
+    for folder_name in sorted_folders:
+        contained_nodes = folder_to_nodes[folder_name]
+
+        all_child_nodes = list(contained_nodes)
+        for other_folder in sorted_folders:
+            if other_folder.startswith(folder_name + "/"):
+                all_child_nodes.extend(folder_to_nodes[other_folder])
+
+        coords = [final_pos[n] for n in all_child_nodes]
         if not coords:
             continue
 
@@ -77,9 +79,9 @@ def create_constrained_layout(
 
         folder_rect_data["x"].append((min_x + max_x) / 2)
         folder_rect_data["y"].append((min_y + max_y) / 2)
-        folder_rect_data["width"].append((max_x - min_x) + 3)
-        folder_rect_data["height"].append((max_y - min_y) + 3)
-        folder_rect_data["name"].append(folder_name)
+        folder_rect_data["width"].append(max_x - min_x)
+        folder_rect_data["height"].append(max_y - min_y)
+        folder_rect_data["name"].append(folder_name.split('/')[-1])
         folder_rect_data["color"].append("#E8E8E8")
 
     if root_folder_nodes:

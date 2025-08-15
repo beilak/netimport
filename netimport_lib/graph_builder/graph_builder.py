@@ -91,15 +91,14 @@ def build_dependency_graph(
 
 def get_display_folder_name(full_path: str, project_root_name: str) -> str:
     try:
-        path_parts = Path(full_path).parts
-        root_index = path_parts.index(project_root_name)
+        full_path_obj = Path(full_path)
+        path_parts = full_path_obj.parts
+        if project_root_name in path_parts:
+            root_index = path_parts.index(project_root_name)
+            if root_index < len(path_parts) - 1:
+                return str(Path(*path_parts[root_index:-1]))
 
-        relative_path_to_file = path_parts[root_index:]
-
-        if len(relative_path_to_file) > 2:
-            return relative_path_to_file[1]
-        else:
-            return project_root_name
+        return str(full_path_obj.parent)
 
     except (ValueError, IndexError):
-        return Path(full_path).parent.name
+        return str(Path(full_path).parent)

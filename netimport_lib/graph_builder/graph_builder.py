@@ -85,6 +85,9 @@ def build_dependency_graph(
         display_folder = get_display_folder_name(node_id, project_root)
         graph.nodes[node_id]["folder"] = display_folder
         graph.nodes[node_id]["is_root_folder"] = display_folder == project_root
+        graph.nodes[node_id]["in_degree"] = graph.in_degree(node_id)
+        graph.nodes[node_id]["out_degree"] = graph.out_degree(node_id)
+        graph.nodes[node_id]["total_degree"] = graph.degree(node_id)
 
     return graph
 

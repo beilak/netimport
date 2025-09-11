@@ -23,15 +23,17 @@ def print_header(title: str) -> None:
 
 def print_top_10_files(graph: nx.DiGraph) -> None:
     print_header("Top-10 Files by Number of Links")
-    degrees = dict(graph.degree())
-    sorted_degrees = sorted(degrees.items(), key=lambda item: item[1], reverse=True)
-    for i, (node, degree) in enumerate(sorted_degrees[:10]):
-        print(f"{i + 1}. {node} - {degree} links")
+    nodes = graph.nodes(data=True)
+    sorted_nodes = sorted(nodes, key=lambda item: item[1].get('total_degree', 0), reverse=True)
+    for i, (node_id, data) in enumerate(sorted_nodes[:10]):
+        total = data.get('total_degree', 0)
+        incoming = data.get('in_degree', 0)
+        print(f"{i + 1}. {node_id} - {total} links ({incoming} incoming)")
 
 
 def print_link_statistics(graph: nx.DiGraph) -> None:
-    print_header("Link Statistics")
-    degrees = [degree for _, degree in graph.degree()]
+    print_header("Link Statistics (Total Links per File)")
+    degrees = [data.get('total_degree', 0) for _, data in graph.nodes(data=True)]
     if not degrees:
         print("No links found in the project.")
         return

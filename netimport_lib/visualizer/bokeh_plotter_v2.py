@@ -132,6 +132,9 @@ def draw_bokeh_graph(graph: nx.DiGraph, layout: str) -> None:
         graph.nodes[node_id]["viz_type"] = node_original_data.get(
             "type", "unresolved"
         )
+        graph.nodes[node_id]["in_degree"] = node_original_data.get("in_degree", 0)
+        graph.nodes[node_id]["out_degree"] = node_original_data.get("out_degree", 0)
+        graph.nodes[node_id]["total_degree"] = node_original_data.get("total_degree", 0)
         graph.nodes[node_id]["viz_label_y_offset"] = (
             calculated_radius_screen + label_padding
         )
@@ -290,7 +293,9 @@ def draw_bokeh_graph(graph: nx.DiGraph, layout: str) -> None:
         hover_tool_instance.tooltips = [
             ("Name", "@viz_label"),
             ("Type", "@viz_type"),
-            ("Links", "@viz_degree"),
+            ("Total Links", "@total_degree"),
+            ("Incoming", "@in_degree"),
+            ("Outgoing", "@out_degree"),
             ("ID", "@index"),
             ("Folder", "@folder"),
         ]

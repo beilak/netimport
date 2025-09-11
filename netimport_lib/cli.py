@@ -49,7 +49,7 @@ IGNORE_NODES: set = set()
 @click.option(
     "--show-console-summary",
     is_flag=True,
-    default=False,
+    default=True,
     help="Show a summary of the project dependencies in the console.",
 )
 def main(

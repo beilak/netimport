@@ -14,7 +14,9 @@ class ShipmentCreator:
         self._shipment_repository = shipment_repository
 
     def new(self, order_id: int, shipment_date: datetime.date, carrier: str, tracking_number: str) -> Shipment:
-        new_shipment: typing.Final = Shipment(id=0, order_id=order_id, shipment_date=shipment_date, carrier=carrier, tracking_number=tracking_number)
+        new_shipment: typing.Final = Shipment(
+            id=0, order_id=order_id, shipment_date=shipment_date, carrier=carrier, tracking_number=tracking_number
+        )
         self._shipment_repository.save(new_shipment)
 
         return new_shipment

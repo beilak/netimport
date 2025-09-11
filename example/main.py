@@ -9,13 +9,12 @@ from example.service.user_creator import UserCreator
 AnyStr = typing.TypeVar("AnyStr", str, bytes)
 
 
-def main(welcome_text: AnyStr) -> None:
+def main[AnyStr: (str, bytes)](welcome_text: AnyStr) -> None:
     creator = AccountCreator(account_repository=AccountRepository())
     creator.new("Test")
 
     user_creator = UserCreator(user_repository=UserRepository())
     user_creator.new("test")
-
 
 
 if __name__ == "__main__":

@@ -1,4 +1,3 @@
-import os
 from pathlib import Path
 
 from netimport_lib.project_file_reader import find_python_files

@@ -1,4 +1,3 @@
-
 from example.domine.user import User
 
 

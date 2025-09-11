@@ -1,6 +1,6 @@
 [project]
 name = "netimport"
-version = "0.0.5"
+version = "0.0.7"
 description = "NetImport: Python Project Architecture Analyzer via Import Graphs"
 authors = [
     {name = "Beilak Aliev", email="beilak.aliev@gmail.com"}
@@ -60,9 +60,9 @@ packages = [{include = "netimport_lib"}]
 
 
 [tool.poetry.group.dev.dependencies]
-mypy = "^1.15.0"
-ruff = "^0.11.11"
-pytest = "^8.4.1"
+mypy = "*"
+ruff = "*"
+pytest = "*"
 
 
 [tool.netimport]

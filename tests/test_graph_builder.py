@@ -61,8 +61,5 @@ from utils import helper
         ("main.py", "utils/helper.py"),
         ("component.py", "utils/helper.py"),
     }
-    actual_edges = {
-        (os.path.relpath(u, project_root), os.path.relpath(v, project_root))
-        for u, v in graph.edges()
-    }
+    actual_edges = {(os.path.relpath(u, project_root), os.path.relpath(v, project_root)) for u, v in graph.edges()}
     assert actual_edges == expected_edges

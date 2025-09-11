@@ -10,7 +10,8 @@ def print_summary(graph: nx.DiGraph) -> None:
         return
 
     print_header("Dependency Graph Summary")
-    print_top_10_files(graph)
+    print_top_10_by_incoming_links(graph)
+    print_top_10_by_outgoing_links(graph)
     print_link_statistics(graph)
     print_external_dependencies(graph)
 
@@ -21,14 +22,22 @@ def print_header(title: str) -> None:
     print("=" * 80 + "\n")
 
 
-def print_top_10_files(graph: nx.DiGraph) -> None:
-    print_header("Top-10 Files by Number of Links")
+def print_top_10_by_incoming_links(graph: nx.DiGraph) -> None:
+    print_header("Top-10 Files by Number of Incoming Links")
     nodes = graph.nodes(data=True)
-    sorted_nodes = sorted(nodes, key=lambda item: item[1].get('total_degree', 0), reverse=True)
+    sorted_nodes = sorted(nodes, key=lambda item: item[1].get('in_degree', 0), reverse=True)
     for i, (node_id, data) in enumerate(sorted_nodes[:10]):
-        total = data.get('total_degree', 0)
         incoming = data.get('in_degree', 0)
-        print(f"{i + 1}. {node_id} - {total} links ({incoming} incoming)")
+        print(f"{i + 1}. {node_id} - {incoming} incoming links")
+
+
+def print_top_10_by_outgoing_links(graph: nx.DiGraph) -> None:
+    print_header("Top-10 Files by Number of Outgoing Links")
+    nodes = graph.nodes(data=True)
+    sorted_nodes = sorted(nodes, key=lambda item: item[1].get('out_degree', 0), reverse=True)
+    for i, (node_id, data) in enumerate(sorted_nodes[:10]):
+        outgoing = data.get('out_degree', 0)
+        print(f"{i + 1}. {node_id} - {outgoing} outgoing links")
 
 
 def print_link_statistics(graph: nx.DiGraph) -> None:

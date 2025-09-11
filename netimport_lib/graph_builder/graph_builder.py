@@ -1,4 +1,3 @@
-import os
 from pathlib import Path
 from typing import TypedDict
 
@@ -22,9 +21,7 @@ def is_node_allow_to_add(node: NodeInfo, ignore: IgnoreConfigNode) -> bool:
         return False
     if ignore["external_lib"] and node.type == "external_lib":
         return False
-    if node.id in ignore["nodes"]:
-        return False
-    return True
+    return node.id not in ignore["nodes"]
 
 
 def build_dependency_graph(
@@ -67,24 +64,21 @@ def build_dependency_graph(
                 continue
 
             if target_node.id not in graph:
-                label = (
-                    Path(target_node.id).name
-                    if target_node.type == "project_file"
-                    else target_node.id
-                )
+                label = Path(target_node.id).name if target_node.type == "project_file" else target_node.id
                 if label in ignore["nodes"]:
                     continue
                 graph.add_node(target_node.id, type=target_node.type, label=label)
 
             if not graph.has_edge(source_node_id, target_node.id):
-                graph.add_edge(
-                    source_node_id, target_node.id, import_raw_string=import_str
-                )
+                graph.add_edge(source_node_id, target_node.id, import_raw_string=import_str)
 
     for node_id in graph.nodes():
         display_folder = get_display_folder_name(node_id, project_root)
         graph.nodes[node_id]["folder"] = display_folder
         graph.nodes[node_id]["is_root_folder"] = display_folder == project_root
+        graph.nodes[node_id]["in_degree"] = graph.in_degree(node_id)
+        graph.nodes[node_id]["out_degree"] = graph.out_degree(node_id)
+        graph.nodes[node_id]["total_degree"] = graph.degree(node_id)
 
     return graph
 

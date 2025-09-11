@@ -47,9 +47,7 @@ def create_constrained_layout(
     final_pos = {}
     for folder_name, nodes_in_folder in folder_to_nodes.items():
         subgraph = graph.subgraph(nodes_in_folder)
-        local_pos = nx.spring_layout(
-            subgraph, k=node_layout_k, iterations=50, seed=FREEZ_RANDOM_SEED, scale=1
-        )
+        local_pos = nx.spring_layout(subgraph, k=node_layout_k, iterations=50, seed=FREEZ_RANDOM_SEED, scale=1)
 
         folder_center_x, folder_center_y = folder_pos[folder_name]
         for node, (x, y) in local_pos.items():
@@ -58,7 +56,7 @@ def create_constrained_layout(
     padding = 1.0
     folder_rect_data = defaultdict(list)
 
-    sorted_folders = sorted(list(folder_to_nodes.keys()), key=lambda x: x.count("/"), reverse=True)
+    sorted_folders = sorted(folder_to_nodes.keys(), key=lambda x: x.count("/"), reverse=True)
 
     for folder_name in sorted_folders:
         contained_nodes = folder_to_nodes[folder_name]
@@ -81,7 +79,7 @@ def create_constrained_layout(
         folder_rect_data["y"].append((min_y + max_y) / 2)
         folder_rect_data["width"].append(max_x - min_x)
         folder_rect_data["height"].append(max_y - min_y)
-        folder_rect_data["name"].append(folder_name.split('/')[-1])
+        folder_rect_data["name"].append(folder_name.split("/")[-1])
         folder_rect_data["color"].append("#E8E8E8")
 
     if root_folder_nodes:
@@ -125,16 +123,13 @@ def draw_bokeh_graph(graph: nx.DiGraph, layout: str) -> None:
         graph.nodes[node_id]["viz_color"] = color_map.get(
             node_original_data.get("type", "unresolved"), default_node_color
         )
-        graph.nodes[node_id]["viz_label"] = node_original_data.get(
-            "label", str(node_id)
-        )
+        graph.nodes[node_id]["viz_label"] = node_original_data.get("label", str(node_id))
         graph.nodes[node_id]["viz_degree"] = current_degree
-        graph.nodes[node_id]["viz_type"] = node_original_data.get(
-            "type", "unresolved"
-        )
-        graph.nodes[node_id]["viz_label_y_offset"] = (
-            calculated_radius_screen + label_padding
-        )
+        graph.nodes[node_id]["viz_type"] = node_original_data.get("type", "unresolved")
+        graph.nodes[node_id]["in_degree"] = node_original_data.get("in_degree", 0)
+        graph.nodes[node_id]["out_degree"] = node_original_data.get("out_degree", 0)
+        graph.nodes[node_id]["total_degree"] = node_original_data.get("total_degree", 0)
+        graph.nodes[node_id]["viz_label_y_offset"] = calculated_radius_screen + label_padding
 
     final_pos, folder_rect_data = create_constrained_layout(graph)
 
@@ -182,21 +177,12 @@ def draw_bokeh_graph(graph: nx.DiGraph, layout: str) -> None:
     if node_data_source and node_data_source.data:
         node_data = node_data_source.data
         if (
-            "x" not in node_data
-            or "y" not in node_data
-            or not node_data.get("x")
-            or not node_data.get("y")
+            "x" not in node_data or "y" not in node_data or not node_data.get("x") or not node_data.get("y")
         ) and node_data.get("index"):
             ordered_node_ids_from_source = node_data["index"]
             try:
-                node_xs = [
-                    final_pos[node_id][0]
-                    for node_id in ordered_node_ids_from_source
-                ]
-                node_ys = [
-                    final_pos[node_id][1]
-                    for node_id in ordered_node_ids_from_source
-                ]
+                node_xs = [final_pos[node_id][0] for node_id in ordered_node_ids_from_source]
+                node_ys = [final_pos[node_id][1] for node_id in ordered_node_ids_from_source]
                 node_data_source.data["x"] = node_xs
                 node_data_source.data["y"] = node_ys
             except KeyError:
@@ -242,15 +228,9 @@ def draw_bokeh_graph(graph: nx.DiGraph, layout: str) -> None:
         sel_glyph.fill_color = "firebrick"
         sel_glyph.line_width = 2
 
-    graph_renderer.edge_renderer.glyph = MultiLine(
-        line_color="#CCCCCC", line_alpha=0.8, line_width=1.5
-    )
-    graph_renderer.edge_renderer.hover_glyph = MultiLine(
-        line_color="orange", line_width=2
-    )
-    graph_renderer.edge_renderer.selection_glyph = MultiLine(
-        line_color="firebrick", line_width=2
-    )
+    graph_renderer.edge_renderer.glyph = MultiLine(line_color="#CCCCCC", line_alpha=0.8, line_width=1.5)
+    graph_renderer.edge_renderer.hover_glyph = MultiLine(line_color="orange", line_width=2)
+    graph_renderer.edge_renderer.selection_glyph = MultiLine(line_color="firebrick", line_width=2)
 
     arrow_source_data = {"start_x": [], "start_y": [], "end_x": [], "end_y": []}
 
@@ -290,7 +270,9 @@ def draw_bokeh_graph(graph: nx.DiGraph, layout: str) -> None:
         hover_tool_instance.tooltips = [
             ("Name", "@viz_label"),
             ("Type", "@viz_type"),
-            ("Links", "@viz_degree"),
+            ("Total Links", "@total_degree"),
+            ("Incoming", "@in_degree"),
+            ("Outgoing", "@out_degree"),
             ("ID", "@index"),
             ("Folder", "@folder"),
         ]

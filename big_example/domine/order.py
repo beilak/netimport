@@ -1,6 +1,5 @@
 import dataclasses
 import datetime
-from typing import List
 
 
 @dataclasses.dataclass
@@ -9,4 +8,4 @@ class Order:
     customer_id: int
     order_date: datetime.date
     status: str
-    order_item_ids: List[int]
+    order_item_ids: list[int]

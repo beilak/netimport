@@ -103,7 +103,7 @@ class ImportVisitor(ast.NodeVisitor):
                 )
             )
 
-    def visit_Import(self, node: ast.Import) -> None:  # noqa: N802
+    def visit_Import(self, node: ast.Import) -> None:
         self._extract_imports(
             node.names,
             module_base=None,
@@ -113,7 +113,7 @@ class ImportVisitor(ast.NodeVisitor):
         )
         self.generic_visit(node)
 
-    def visit_ImportFrom(self, node: ast.ImportFrom) -> None:  # noqa: N802
+    def visit_ImportFrom(self, node: ast.ImportFrom) -> None:
         module_base = node.module if node.module else ""
         level = node.level
         self._extract_imports(
@@ -125,7 +125,7 @@ class ImportVisitor(ast.NodeVisitor):
         )
         self.generic_visit(node)
 
-    def visit_If(self, node: ast.If) -> None:  # noqa: N802
+    def visit_If(self, node: ast.If) -> None:
         is_type_checking_if = False
         # for if TYPE_CHECKING:
         if isinstance(node.test, ast.Name) and node.test.id == "TYPE_CHECKING":
@@ -155,9 +155,7 @@ class ImportVisitor(ast.NodeVisitor):
             self.visit(stmt)
 
 
-def get_imported_modules_as_strings(
-    file_path: str, include_type_checking_imports: bool = False
-) -> list[str]:
+def get_imported_modules_as_strings(file_path: str, include_type_checking_imports: bool = False) -> list[str]:
     path = Path(file_path)
     if not path.exists() or not path.is_file():
         return []

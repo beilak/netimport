@@ -13,7 +13,9 @@ class AddressCreator:
         self._address_repository = address_repository
 
     def new(self, street: str, city: str, state: str, zip_code: str, country: str) -> Address:
-        new_address: typing.Final = Address(id=0, street=street, city=city, state=state, zip_code=zip_code, country=country)
+        new_address: typing.Final = Address(
+            id=0, street=street, city=city, state=state, zip_code=zip_code, country=country
+        )
         self._address_repository.save(new_address)
 
         return new_address

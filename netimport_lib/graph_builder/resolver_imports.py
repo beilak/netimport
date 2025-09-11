@@ -43,26 +43,19 @@ def try_resolve_module_path(
 
     # 2.try to find <path>/<modul>/__init__.py
     # example.service.account_creator -> example/service/account_creator/__init__.py
-    potential_package_path = (
-        "/".join(current_path_parts + module_path_parts) + "/__init__.py"
-    )
+    potential_package_path = "/".join(current_path_parts + module_path_parts) + "/__init__.py"
     potential_package_path = normalize_path(potential_package_path)
     if potential_package_path in project_files_normalized:
         return potential_package_path
 
     # 3. add root
-    potential_file_path = (
-        "/".join([project_root, *current_path_parts, *module_path_parts]) + ".py"
-    )
+    potential_file_path = "/".join([project_root, *current_path_parts, *module_path_parts]) + ".py"
     potential_file_path = normalize_path(potential_file_path)
     if potential_file_path in project_files_normalized:
         return potential_file_path
 
     # 4. add root
-    potential_package_path = (
-        "/".join([project_root, *current_path_parts, *module_path_parts])
-        + "/__init__.py"
-    )
+    potential_package_path = "/".join([project_root, *current_path_parts, *module_path_parts]) + "/__init__.py"
     potential_package_path = normalize_path(potential_package_path)
     if potential_package_path in project_files_normalized:
         return potential_package_path

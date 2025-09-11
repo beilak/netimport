@@ -13,7 +13,9 @@ class ProductCreator:
         self._product_repository = product_repository
 
     def new(self, name: str, description: str, price: float, category_id: int) -> Product:
-        new_product: typing.Final = Product(id=0, name=name, description=description, price=price, category_id=category_id)
+        new_product: typing.Final = Product(
+            id=0, name=name, description=description, price=price, category_id=category_id
+        )
         self._product_repository.save(new_product)
 
         return new_product

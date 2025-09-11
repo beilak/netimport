@@ -51,12 +51,8 @@ def draw_graph_mpl(graph: nx.DiGraph, layout: str) -> None:
         node_colors.append(color_map.get(data.get("type", "unresolved"), "lightgray"))
         node_labels[node] = data.get("label", node)
 
-    nx.draw_networkx_nodes(
-        graph, pos, node_color=node_colors, node_size=node_size, alpha=0.9
-    )
-    nx.draw_networkx_labels(
-        graph, pos, labels=node_labels, font_size=9, font_weight="bold"
-    )
+    nx.draw_networkx_nodes(graph, pos, node_color=node_colors, node_size=node_size, alpha=0.9)
+    nx.draw_networkx_labels(graph, pos, labels=node_labels, font_size=9, font_weight="bold")
     nx.draw_networkx_edges(
         graph,
         pos,

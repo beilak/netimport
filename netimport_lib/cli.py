@@ -8,6 +8,7 @@ from netimport_lib.graph_builder.graph_builder import (
 )
 from netimport_lib.imports_reader import get_imported_modules_as_strings
 from netimport_lib.project_file_reader import find_python_files
+from netimport_lib.summary_builder import print_summary
 from netimport_lib.visualizer import GRAPH_VISUALIZERS
 
 
@@ -45,10 +46,17 @@ IGNORE_NODES: set = set()
     default="bokeh",
     show_default=True,
 )
+@click.option(
+    "--show-console-summary",
+    is_flag=True,
+    default=True,
+    help="Show a summary of the project dependencies in the console.",
+)
 def main(
     project_path: str,
     layout: str,
     show_graph: str | None = "bokeh",
+    show_console_summary: bool = False,
 ) -> None:
     loaded_config: NetImportConfigMap = load_config(".")
 
@@ -85,3 +93,6 @@ def main(
 
     if show_graph and (visualizer := GRAPH_VISUALIZERS.get(show_graph)):
         visualizer(dependency_graph, layout)
+
+    if show_console_summary:
+        print_summary(dependency_graph)

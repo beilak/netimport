@@ -11,6 +11,8 @@ from typing import Final, cast
 import click
 import networkx as nx
 
+from netimport_lib.violations import Violation, build_violations_payload
+
 
 TOP_ITEMS_LIMIT: Final[int] = 10
 PROJECT_FILE_NODE_TYPE: Final[str] = "project_file"
@@ -87,20 +89,21 @@ class _DependencySummaryPayload:
     most_dependent_project_files: list[_RankedProjectFileSummary]
     external_dependencies: list[str]
     unresolved_imports: list[_UnresolvedImportSummary]
+    violations: list[dict[str, str]]
 
 
-def print_summary(graph: nx.DiGraph) -> None:
+def print_summary(graph: nx.DiGraph, violations: Sequence[Violation] = ()) -> None:
     """Print a formatted dependency summary for a graph."""
-    for line in format_summary(graph):
+    for line in format_summary(graph, violations):
         click.echo(line)
 
 
-def print_json_summary(graph: nx.DiGraph) -> None:
+def print_json_summary(graph: nx.DiGraph, violations: Sequence[Violation] = ()) -> None:
     """Print a machine-readable dependency summary for a graph."""
-    click.echo(format_summary_json(graph))
+    click.echo(format_summary_json(graph, violations))
 
 
-def format_summary(graph: nx.DiGraph) -> list[str]:
+def format_summary(graph: nx.DiGraph, violations: Sequence[Violation] = ()) -> list[str]:
     """Build a deterministic text summary for a dependency graph."""
     if not graph.nodes:
         return []
@@ -171,6 +174,7 @@ def format_summary(graph: nx.DiGraph) -> list[str]:
         _build_section(
             "Unresolved Imports", _format_unresolved_entries(_build_unresolved_entries(graph))
         ),
+        _build_section("Policy Violations", _format_violations(violations)),
     ]
 
     lines: list[str] = []
@@ -182,7 +186,10 @@ def format_summary(graph: nx.DiGraph) -> list[str]:
     return lines
 
 
-def build_summary_payload(graph: nx.DiGraph) -> dict[str, object]:
+def build_summary_payload(
+    graph: nx.DiGraph,
+    violations: Sequence[Violation] = (),
+) -> dict[str, object]:
     """Build a deterministic structured summary for a dependency graph."""
     project_entries = _build_project_entries(graph)
     external_entries = _build_external_entries(graph)
@@ -245,14 +252,15 @@ def build_summary_payload(graph: nx.DiGraph) -> dict[str, object]:
             )
             for index, entry in enumerate(unresolved_entries, start=1)
         ],
+        violations=build_violations_payload(list(violations)),
     )
 
     return cast("dict[str, object]", asdict(payload))
 
 
-def format_summary_json(graph: nx.DiGraph) -> str:
+def format_summary_json(graph: nx.DiGraph, violations: Sequence[Violation] = ()) -> str:
     """Serialize a deterministic JSON dependency summary for a graph."""
-    return json.dumps(build_summary_payload(graph), indent=2)
+    return json.dumps(build_summary_payload(graph, violations), indent=2)
 
 
 def _build_section(title: str, body_lines: Sequence[str]) -> list[str]:
@@ -494,6 +502,25 @@ def _format_unresolved_entries(entries: Sequence[_SimpleNodeSummary]) -> list[st
         [
             (str(index), entry.display_name, entry.node_type)
             for index, entry in enumerate(entries, start=1)
+        ],
+    )
+
+
+def _format_violations(violations: Sequence[Violation]) -> list[str]:
+    if not violations:
+        return _format_table(("Rule", "Message"), [("None", "-")])
+
+    return _format_table(
+        ("Rank", "Rule", "Target", "Type", "Message"),
+        [
+            (
+                str(index),
+                violation.rule,
+                violation.label,
+                violation.node_type,
+                violation.message,
+            )
+            for index, violation in enumerate(violations, start=1)
         ],
     )
 

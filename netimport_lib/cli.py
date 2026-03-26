@@ -16,6 +16,7 @@ from netimport_lib.graph_builder.graph_builder import IgnoreConfigNode, build_de
 from netimport_lib.imports_reader import get_imported_modules_as_strings
 from netimport_lib.project_file_reader import find_python_files
 from netimport_lib.summary_builder import print_json_summary, print_summary
+from netimport_lib.violations import build_violations
 from netimport_lib.visualizer import (
     DEFAULT_VISUALIZER,
     GRAPH_LAYOUT_CHOICES,
@@ -75,6 +76,12 @@ class _CliOverrides:
     help="Output format for --show-console-summary.",
 )
 @click.option(
+    "--fail-on-violation",
+    is_flag=True,
+    default=False,
+    help="Exit with code 1 when configured policy violations are found.",
+)
+@click.option(
     "--ignored-dir",
     "ignored_dirs",
     multiple=True,
@@ -126,6 +133,7 @@ def main(  # noqa: PLR0913
     no_show_graph: bool = False,
     show_console_summary: bool = False,
     summary_format: str = "text",
+    fail_on_violation: bool = False,
     ignored_dirs: tuple[str, ...] = (),
     ignored_files: tuple[str, ...] = (),
     ignored_nodes: tuple[str, ...] = (),
@@ -171,15 +179,23 @@ def main(  # noqa: PLR0913
         ),
     )
     _remove_isolated_init_nodes(dependency_graph)
+    violations = build_violations(
+        dependency_graph,
+        fail_on_unresolved_imports=loaded_config["fail_on_unresolved_imports"],
+        forbidden_external_libs=loaded_config["forbidden_external_libs"],
+    )
 
     if selected_visualizer is not None and selected_layout is not None:
         selected_visualizer.render(dependency_graph, selected_layout)
 
     if show_console_summary:
         if summary_format == "json":
-            print_json_summary(dependency_graph)
+            print_json_summary(dependency_graph, violations)
         else:
-            print_summary(dependency_graph)
+            print_summary(dependency_graph, violations)
+
+    if fail_on_violation and violations:
+        raise click.exceptions.Exit(1)
 
 
 def _remove_isolated_init_nodes(dependency_graph: nx.DiGraph) -> None:
@@ -218,6 +234,8 @@ def _merge_cli_config(
         "ignored_files": set(loaded_config["ignored_files"]),
         "ignore_stdlib": loaded_config["ignore_stdlib"],
         "ignore_external_lib": loaded_config["ignore_external_lib"],
+        "fail_on_unresolved_imports": loaded_config["fail_on_unresolved_imports"],
+        "forbidden_external_libs": set(loaded_config["forbidden_external_libs"]),
     }
 
     merged_config["ignored_dirs"].update(cli_overrides.ignored_dirs)

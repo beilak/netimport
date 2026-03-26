@@ -95,6 +95,11 @@ Print a textual dependency report with tables for:
 
 Choose the output format for `--show-console-summary`.
 
+`--fail-on-violation`
+
+Exit with code `1` when configured policy violations are found. This is intended
+for CI usage together with summary output.
+
 - `text` keeps the current human-readable table output
 - `json` emits a deterministic machine-readable report for CI and automation
 
@@ -262,6 +267,8 @@ Supported keys:
 - `ignore_stdlib`
 - `ignore_external_lib`
 - `ignored_nodes`
+- `fail_on_unresolved_imports`
+- `forbidden_external_libs`
 
 `pyproject.toml` example:
 
@@ -272,6 +279,8 @@ ignored_files = ["setup.py", "manage.py"]
 ignore_stdlib = true
 ignore_external_lib = true
 ignored_nodes = []
+fail_on_unresolved_imports = true
+forbidden_external_libs = ["requests"]
 ```
 
 `.netimport.toml` example:
@@ -282,6 +291,8 @@ ignored_files = ["setup.py"]
 ignore_stdlib = false
 ignore_external_lib = false
 ignored_nodes = []
+fail_on_unresolved_imports = false
+forbidden_external_libs = []
 ```
 
 Explicit `--config` example using top-level keys:
@@ -292,6 +303,8 @@ ignored_files = ["bootstrap.py"]
 ignore_stdlib = true
 ignore_external_lib = false
 ignored_nodes = ["requests"]
+fail_on_unresolved_imports = true
+forbidden_external_libs = ["requests"]
 ```
 
 Explicit `--config` can also point to a `pyproject.toml`-style file:

@@ -95,7 +95,7 @@ def _build_layout_positions(graph: nx.DiGraph, layout: str) -> dict[object, Node
 
     try:
         return _normalize_layout_positions(layout_builder(graph))
-    except nx.NetworkXException as exc:
+    except Exception as exc:
         if layout != "planar_layout":
             raise
         raise ValueError(

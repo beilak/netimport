@@ -15,6 +15,8 @@ class NetImportConfigMap(TypedDict):
     ignored_files: set[str]
     ignore_stdlib: bool
     ignore_external_lib: bool
+    fail_on_unresolved_imports: bool
+    forbidden_external_libs: set[str]
 
 
 class PartialNetImportConfigMap(TypedDict, total=False):
@@ -25,6 +27,8 @@ class PartialNetImportConfigMap(TypedDict, total=False):
     ignored_files: set[str]
     ignore_stdlib: bool
     ignore_external_lib: bool
+    fail_on_unresolved_imports: bool
+    forbidden_external_libs: set[str]
 
 
 CONFIG_FILE_NAME: Final[str] = ".netimport.toml"
@@ -37,6 +41,8 @@ IGNORED_DIRS_KEY: Final[str] = "ignored_dirs"
 IGNORED_FILES_KEY: Final[str] = "ignored_files"
 IGNORE_STDLIB_KEY: Final[str] = "ignore_stdlib"
 IGNORE_EXTERNAL_LIB_KEY: Final[str] = "ignore_external_lib"
+FAIL_ON_UNRESOLVED_IMPORTS_KEY: Final[str] = "fail_on_unresolved_imports"
+FORBIDDEN_EXTERNAL_LIBS_KEY: Final[str] = "forbidden_external_libs"
 KNOWN_CONFIG_KEYS: Final[frozenset[str]] = frozenset(
     {
         IGNORED_NODES_KEY,
@@ -44,6 +50,8 @@ KNOWN_CONFIG_KEYS: Final[frozenset[str]] = frozenset(
         IGNORED_FILES_KEY,
         IGNORE_STDLIB_KEY,
         IGNORE_EXTERNAL_LIB_KEY,
+        FAIL_ON_UNRESOLVED_IMPORTS_KEY,
+        FORBIDDEN_EXTERNAL_LIBS_KEY,
     }
 )
 
@@ -56,6 +64,8 @@ def default_config() -> NetImportConfigMap:
         ignored_files=set(),
         ignore_stdlib=False,
         ignore_external_lib=False,
+        fail_on_unresolved_imports=False,
+        forbidden_external_libs=set(),
     )
 
 
@@ -97,6 +107,16 @@ def _parse_config_object(app_config: Mapping[str, object]) -> PartialNetImportCo
         parsed_config["ignore_stdlib"] = _parse_bool(app_config, IGNORE_STDLIB_KEY)
     if "ignore_external_lib" in app_config:
         parsed_config["ignore_external_lib"] = _parse_bool(app_config, IGNORE_EXTERNAL_LIB_KEY)
+    if "fail_on_unresolved_imports" in app_config:
+        parsed_config["fail_on_unresolved_imports"] = _parse_bool(
+            app_config,
+            FAIL_ON_UNRESOLVED_IMPORTS_KEY,
+        )
+    if "forbidden_external_libs" in app_config:
+        parsed_config["forbidden_external_libs"] = _parse_string_set(
+            app_config,
+            FORBIDDEN_EXTERNAL_LIBS_KEY,
+        )
 
     return parsed_config
 
@@ -111,6 +131,8 @@ def merge_config(
     ignored_files = set(base_config["ignored_files"])
     ignore_stdlib = base_config["ignore_stdlib"]
     ignore_external_lib = base_config["ignore_external_lib"]
+    fail_on_unresolved_imports = base_config["fail_on_unresolved_imports"]
+    forbidden_external_libs = set(base_config["forbidden_external_libs"])
 
     if "ignored_nodes" in override_config:
         ignored_nodes = set(override_config["ignored_nodes"])
@@ -122,6 +144,10 @@ def merge_config(
         ignore_stdlib = override_config["ignore_stdlib"]
     if "ignore_external_lib" in override_config:
         ignore_external_lib = override_config["ignore_external_lib"]
+    if "fail_on_unresolved_imports" in override_config:
+        fail_on_unresolved_imports = override_config["fail_on_unresolved_imports"]
+    if "forbidden_external_libs" in override_config:
+        forbidden_external_libs = set(override_config["forbidden_external_libs"])
 
     return NetImportConfigMap(
         ignored_nodes=ignored_nodes,
@@ -129,6 +155,8 @@ def merge_config(
         ignored_files=ignored_files,
         ignore_stdlib=ignore_stdlib,
         ignore_external_lib=ignore_external_lib,
+        fail_on_unresolved_imports=fail_on_unresolved_imports,
+        forbidden_external_libs=forbidden_external_libs,
     )
 
 

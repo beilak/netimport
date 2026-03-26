@@ -18,6 +18,8 @@ def _default_loaded_config(_project_root: str) -> NetImportConfigMap:
         "ignored_files": set(),
         "ignore_stdlib": False,
         "ignore_external_lib": False,
+        "fail_on_unresolved_imports": False,
+        "forbidden_external_libs": set(),
     }
 
 
@@ -131,6 +133,88 @@ def test_cli_prints_json_summary(monkeypatch: MonkeyPatch, tmp_path: Path) -> No
     assert payload["unresolved_imports"] == [
         {"rank": 1, "import_name": ".missing.item", "type": "unresolved_relative"}
     ]
+    assert payload["violations"] == []
+
+
+def test_cli_fails_with_exit_code_one_when_policy_violations_are_found(
+    monkeypatch: MonkeyPatch,
+    tmp_path: Path,
+) -> None:
+    project_root = tmp_path / "sample_project"
+    project_root.mkdir()
+
+    (project_root / "main.py").write_text(
+        "import requests\nfrom .missing import item\n",
+        encoding="utf-8",
+    )
+
+    def load_config_with_policy(_project_root: str) -> NetImportConfigMap:
+        return {
+            "ignored_nodes": set(),
+            "ignored_dirs": set(),
+            "ignored_files": set(),
+            "ignore_stdlib": False,
+            "ignore_external_lib": False,
+            "fail_on_unresolved_imports": True,
+            "forbidden_external_libs": {"requests"},
+        }
+
+    monkeypatch.setattr(cli, "GRAPH_VISUALIZERS", {})
+    monkeypatch.setattr(cli, "load_config", load_config_with_policy)
+
+    runner: Final[CliRunner] = CliRunner()
+    result = runner.invoke(
+        cli.main,
+        [
+            str(project_root),
+            "--show-console-summary",
+            "--summary-format",
+            "json",
+            "--no-show-graph",
+            "--fail-on-violation",
+        ],
+    )
+
+    assert result.exit_code == 1
+    payload = json.loads(result.output)
+    assert [item["rule"] for item in payload["violations"]] == [
+        "forbidden_external_lib",
+        "unresolved_import",
+    ]
+
+
+def test_cli_does_not_fail_without_fail_flag_when_policy_violations_are_found(
+    monkeypatch: MonkeyPatch,
+    tmp_path: Path,
+) -> None:
+    project_root = tmp_path / "sample_project"
+    project_root.mkdir()
+
+    (project_root / "main.py").write_text("from .missing import item\n", encoding="utf-8")
+
+    def load_config_with_policy(_project_root: str) -> NetImportConfigMap:
+        return {
+            "ignored_nodes": set(),
+            "ignored_dirs": set(),
+            "ignored_files": set(),
+            "ignore_stdlib": False,
+            "ignore_external_lib": False,
+            "fail_on_unresolved_imports": True,
+            "forbidden_external_libs": set(),
+        }
+
+    monkeypatch.setattr(cli, "GRAPH_VISUALIZERS", {})
+    monkeypatch.setattr(cli, "load_config", load_config_with_policy)
+
+    runner: Final[CliRunner] = CliRunner()
+    result = runner.invoke(
+        cli.main,
+        [str(project_root), "--show-console-summary", "--no-show-graph"],
+    )
+
+    assert result.exit_code == 0
+    assert "Policy Violations" in result.output
+    assert "unresolved_import" in result.output
 
 
 def test_cli_no_show_graph_disables_visualizer(monkeypatch: MonkeyPatch, tmp_path: Path) -> None:

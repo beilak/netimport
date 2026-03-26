@@ -805,7 +805,7 @@ Recommended order for another LLM:
 5. Refactor and type-fix visualizers.
 6. Make `mypy` and `ruff` green.
 7. Revisit demo-folder policy.
-8. Add optional production features such as DOT/Mermaid export and CI-oriented failure modes.
+8. Add optional production features such as DOT/Mermaid export and richer rule validation.
 
 This order reduces rework because config + summary + tests create the base contract first.
 
@@ -835,9 +835,16 @@ These are not the first blockers, but they would materially improve the tool:
    - efferent coupling
    - instability
 3. Layer/rule validation.
-4. Exit codes that fail CI based on violations.
-5. HTML report output.
-6. Performance profiling on large repos.
+4. HTML report output.
+5. Performance profiling on large repos.
+
+CI-oriented failure modes are now available in a minimal but useful form:
+
+- config can declare `fail_on_unresolved_imports`
+- config can declare `forbidden_external_libs`
+- CLI supports `--fail-on-violation`
+- summary output includes structured `violations`
+- CI can fail with exit code `1` when configured violations are present
 
 ## Final Assessment
 
@@ -856,6 +863,7 @@ Most of those hardening items are now fixed. The project has materially improved
 - CLI module execution works
 - the demo-folder policy is explicit
 - product-facing tests are significantly stronger
+- CI-oriented violation reporting and failure exit codes now exist for the current policy scope
 
 Product-positioning gaps from the original audit have now been addressed:
 

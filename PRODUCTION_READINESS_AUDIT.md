@@ -35,10 +35,9 @@ The core idea is implemented and the basic graph-building flow exists:
 What is missing is the product layer around that core:
 
 - some config-loading gaps have been closed, but overall product hardening is still incomplete
-- some documentation still needs follow-up, but core CLI usage is now documented
+- some documentation still needs follow-up, but core CLI usage and supported visualizer modes are now documented
 - type checks and lints are not green
 - test coverage is too shallow for a production CLI tool
-- visualizer behavior is only partially aligned with CLI options
 
 Practical assessment: this is a useful alpha/prototype, not yet a production-ready tool.
 
@@ -275,7 +274,32 @@ Add tests in layers:
 - summary and resolver edge cases are covered
 - shallow/no-op demo tests are removed or improved
 
-## P2. Visualizer contract is inconsistent
+## DONE. P2. Visualizer contract is consistent
+
+### Status
+
+Implemented in `netimport_lib/visualizer/__init__.py`, `netimport_lib/visualizer/mpl_plotter.py`, `netimport_lib/visualizer/bokeh_plotter_v2.py`, `netimport_lib/cli.py`, and documented in `README.md`.
+
+### Done
+
+1. Introduced a central visualizer registry with explicit supported backends and layout lists.
+2. Restricted the public CLI contract to actually supported backends:
+   - `bokeh`
+   - `mpl`
+3. Restricted the public CLI contract to actually supported layouts:
+   - `bokeh`: `constrained`
+   - `mpl`: `spring`, `circular`, `shell`, `planar_layout`
+4. Removed unsupported Graphviz-like layouts from the CLI contract.
+5. Made CLI layout resolution backend-aware, including backend-specific default layouts.
+6. Rejected unsupported backend/layout combinations with a clear CLI error instead of silently falling back.
+7. Made Bokeh use an explicit supported layout contract instead of ignoring the `layout` argument.
+8. Kept `plotly_plotter.py` out of the public backend list until it is explicitly supported.
+9. Added CLI and registry tests covering:
+   - backend defaults
+   - supported combinations
+   - rejected combinations
+   - `--help` output
+10. Updated `README.md` with the actual supported visualization modes and launch examples.
 
 ### Why it matters
 
@@ -516,10 +540,10 @@ This section is the implementation backlog for another LLM or engineer.
 
 ### Tasks
 
-1. Decide supported backends: `bokeh`, `mpl`, maybe `plotly`.
-2. Decide supported layouts per backend.
+1. DONE. Decide supported backends: `bokeh`, `mpl`, maybe `plotly`.
+2. DONE. Decide supported layouts per backend.
 3. Remove or implement dead/hidden code paths.
-4. Make unsupported layout/backend combinations fail clearly.
+4. DONE. Make unsupported layout/backend combinations fail clearly.
 5. Consider separating graph generation from side-effectful rendering.
 
 ### Files likely to change

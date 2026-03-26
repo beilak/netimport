@@ -2,6 +2,7 @@
 
 from collections import defaultdict
 from collections.abc import Mapping, Sequence
+from dataclasses import dataclass
 from types import MappingProxyType
 from typing import Final, TypedDict, cast
 
@@ -44,6 +45,30 @@ class ArrowSourceData(TypedDict):
     start_y: list[float]
     end_x: list[float]
     end_y: list[float]
+
+
+class NodeVisualData(TypedDict):
+    """Visual attributes derived from graph metadata."""
+
+    viz_size: int
+    viz_color: str
+    viz_label: str
+    viz_degree: int
+    viz_type: str
+    viz_label_y_offset: int
+    in_degree: int
+    out_degree: int
+    total_degree: int
+
+
+@dataclass(frozen=True, slots=True)
+class PreparedBokehRender:
+    """Data prepared for Bokeh rendering."""
+
+    final_positions: dict[str, tuple[float, float]]
+    folder_rect_data: FolderRectData
+    arrow_source_data: ArrowSourceData
+    node_visual_data: dict[object, NodeVisualData]
 
 
 FREEZE_RANDOM_SEED: Final[int] = 42
@@ -263,26 +288,46 @@ def _build_bokeh_layout(
     return _create_constrained_layout(graph)
 
 
-def _populate_node_visual_data(graph: nx.DiGraph) -> None:
+def _build_node_visual_data(graph: nx.DiGraph) -> dict[object, NodeVisualData]:
     degrees = dict(graph.degree())
+    visual_data: dict[object, NodeVisualData] = {}
 
     for node_id in list(graph.nodes()):
         node_data = graph.nodes[node_id]
         current_degree = degrees.get(node_id, 0)
         calculated_size = MIN_NODE_SIZE + current_degree * 10
 
-        node_data["viz_size"] = calculated_size
-        node_data["viz_color"] = COLOR_MAP.get(
-            str(node_data.get("type", "unresolved")),
-            DEFAULT_NODE_COLOR,
-        )
-        node_data["viz_label"] = str(node_data.get("label", node_id))
-        node_data["viz_degree"] = current_degree
-        node_data["viz_type"] = str(node_data.get("type", "unresolved"))
-        node_data["viz_label_y_offset"] = int(calculated_size / 2.0 + LABEL_PADDING)
-        node_data["in_degree"] = _to_int(node_data.get("in_degree", 0))
-        node_data["out_degree"] = _to_int(node_data.get("out_degree", 0))
-        node_data["total_degree"] = _to_int(node_data.get("total_degree", 0))
+        visual_data[node_id] = {
+            "viz_size": calculated_size,
+            "viz_color": COLOR_MAP.get(
+                str(node_data.get("type", "unresolved")),
+                DEFAULT_NODE_COLOR,
+            ),
+            "viz_label": str(node_data.get("label", node_id)),
+            "viz_degree": current_degree,
+            "viz_type": str(node_data.get("type", "unresolved")),
+            "viz_label_y_offset": int(calculated_size / 2.0 + LABEL_PADDING),
+            "in_degree": _to_int(node_data.get("in_degree", 0)),
+            "out_degree": _to_int(node_data.get("out_degree", 0)),
+            "total_degree": _to_int(node_data.get("total_degree", 0)),
+        }
+
+    return visual_data
+
+
+def _copy_graph_with_visual_data(
+    graph: nx.DiGraph,
+    node_visual_data: Mapping[object, NodeVisualData],
+) -> nx.DiGraph:
+    graph_to_draw = nx.DiGraph()
+    for node_id, node_data in graph.nodes(data=True):
+        graph_to_draw.add_node(node_id, **dict(node_data))
+    for start_node, end_node in graph.edges():
+        graph_to_draw.add_edge(start_node, end_node)
+    for node_id, visual_data in node_visual_data.items():
+        graph_to_draw.nodes[node_id].update(visual_data)
+
+    return graph_to_draw
 
 
 def _to_int(value: object) -> int:
@@ -426,10 +471,9 @@ def _build_arrow_source_data(
 
 def _add_arrow_renderer(
     plot: figure_model,
-    graph: nx.DiGraph,
-    final_positions: Mapping[str, tuple[float, float]],
+    arrow_source_data: ArrowSourceData,
 ) -> None:
-    arrow_source = ColumnDataSource(data=_build_arrow_source_data(graph, final_positions))
+    arrow_source = ColumnDataSource(data=arrow_source_data)
     arrow_renderer = Arrow(
         end=OpenHead(line_color="gray", line_width=2, size=12),
         source=arrow_source,
@@ -464,20 +508,31 @@ def _enable_node_dragging(plot: figure_model, graph_renderer: GraphRenderer) -> 
     plot.toolbar.active_drag = point_draw_tool
 
 
+def prepare_bokeh_render(graph: nx.DiGraph, layout: str) -> PreparedBokehRender:
+    """Prepare layout and visual attributes for Bokeh rendering."""
+    final_positions, folder_rect_data = _build_bokeh_layout(graph, layout)
+
+    return PreparedBokehRender(
+        final_positions=final_positions,
+        folder_rect_data=folder_rect_data,
+        arrow_source_data=_build_arrow_source_data(graph, final_positions),
+        node_visual_data=_build_node_visual_data(graph),
+    )
+
+
 def draw_bokeh_graph(graph: nx.DiGraph, layout: str) -> None:
     """Render a dependency graph with Bokeh."""
-    _populate_node_visual_data(graph)
-
-    final_positions, folder_rect_data = _build_bokeh_layout(graph, layout)
-    plot, _folder_source = _create_bokeh_plot(folder_rect_data)
+    render_data = prepare_bokeh_render(graph, layout)
+    graph_to_draw = _copy_graph_with_visual_data(graph, render_data.node_visual_data)
+    plot, _folder_source = _create_bokeh_plot(render_data.folder_rect_data)
     graph_renderer = from_networkx(
-        graph,
-        cast("dict[int | str, Sequence[float]]", final_positions),
+        graph_to_draw,
+        cast("dict[int | str, Sequence[float]]", render_data.final_positions),
     )
-    _sync_node_coordinates(graph_renderer, final_positions)
+    _sync_node_coordinates(graph_renderer, render_data.final_positions)
     _configure_node_renderer(graph_renderer)
     _configure_edge_renderer(graph_renderer)
-    _add_arrow_renderer(plot, graph, final_positions)
+    _add_arrow_renderer(plot, render_data.arrow_source_data)
     graph_renderer.selection_policy = NodesAndLinkedEdges()
     graph_renderer.inspection_policy = NodesAndLinkedEdges()
     _configure_hover(plot, graph_renderer)

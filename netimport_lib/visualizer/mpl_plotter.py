@@ -1,6 +1,7 @@
 """Matplotlib-based graph rendering."""
 
 from collections.abc import Callable, Mapping, Sequence
+from dataclasses import dataclass
 from types import MappingProxyType
 from typing import Final, TypeAlias, cast
 
@@ -28,7 +29,18 @@ NODE_COLOR_MAP: Final[Mapping[str, str]] = MappingProxyType(
 )
 
 
-def _normalize_layout_positions(raw_positions: RawLayoutPositions) -> dict[str, NodePosition]:
+@dataclass(frozen=True, slots=True)
+class PreparedMplRender:
+    """Data prepared for Matplotlib rendering."""
+
+    positions: dict[object, NodePosition]
+    ordered_node_ids: tuple[object, ...]
+    node_sizes: tuple[int, ...]
+    node_colors: tuple[str, ...]
+    node_labels: dict[object, str]
+
+
+def _normalize_layout_positions(raw_positions: RawLayoutPositions) -> dict[object, NodePosition]:
     return {
         node_id: (float(position[0]), float(position[1]))
         for node_id, position in raw_positions.items()
@@ -72,7 +84,7 @@ MPL_LAYOUT_BUILDERS: Final[dict[str, MplLayoutBuilder]] = {
 }
 
 
-def _build_layout_positions(graph: nx.DiGraph, layout: str) -> dict[str, NodePosition]:
+def _build_layout_positions(graph: nx.DiGraph, layout: str) -> dict[object, NodePosition]:
     try:
         layout_builder = MPL_LAYOUT_BUILDERS[layout]
     except KeyError as exc:
@@ -84,30 +96,41 @@ def _build_layout_positions(graph: nx.DiGraph, layout: str) -> dict[str, NodePos
     return _normalize_layout_positions(layout_builder(graph))
 
 
+def prepare_mpl_render(graph: nx.DiGraph, layout: str) -> PreparedMplRender:
+    """Prepare layout and visual attributes for Matplotlib rendering."""
+    ordered_node_ids = tuple(graph.nodes())
+
+    return PreparedMplRender(
+        positions=_build_layout_positions(graph, layout),
+        ordered_node_ids=ordered_node_ids,
+        node_sizes=tuple(
+            MIN_NODE_SIZE + 2000 * graph.in_degree(node_id)
+            for node_id in ordered_node_ids
+        ),
+        node_colors=tuple(
+            NODE_COLOR_MAP.get(str(graph.nodes[node_id].get("type", "unresolved")), "lightgray")
+            for node_id in ordered_node_ids
+        ),
+        node_labels={
+            node_id: str(graph.nodes[node_id].get("label", node_id))
+            for node_id in ordered_node_ids
+        },
+    )
+
+
 def draw_graph_mpl(graph: nx.DiGraph, layout: str) -> None:
     """Render a dependency graph with Matplotlib."""
     plt.figure(figsize=(18, 12))
 
-    positions = _build_layout_positions(graph, layout)
-    normalized_positions = cast("Mapping[object, Sequence[float]]", positions)
-    node_sizes = [MIN_NODE_SIZE + 2000 * graph.in_degree(node_id) for node_id in graph.nodes()]
-    node_colors = [
-        NODE_COLOR_MAP.get(str(graph.nodes[node_id].get("type", "unresolved")), "lightgray")
-        for node_id in graph.nodes()
-    ]
-    node_labels = cast(
-        "Mapping[object, str]",
-        {
-            str(node_id): str(graph.nodes[node_id].get("label", node_id))
-            for node_id in graph.nodes()
-        },
-    )
+    render_data = prepare_mpl_render(graph, layout)
+    normalized_positions = cast("Mapping[object, Sequence[float]]", render_data.positions)
+    node_labels = cast("Mapping[object, str]", render_data.node_labels)
 
     nx.draw_networkx_nodes(
         graph,
         normalized_positions,
-        node_color=node_colors,
-        node_size=node_sizes,
+        node_color=list(render_data.node_colors),
+        node_size=list(render_data.node_sizes),
         alpha=0.9,
     )
     nx.draw_networkx_labels(
@@ -126,7 +149,7 @@ def draw_graph_mpl(graph: nx.DiGraph, layout: str) -> None:
         arrowsize=20,
         edge_color="gray",
         width=1,
-        node_size=node_sizes,
+        node_size=list(render_data.node_sizes),
         connectionstyle="arc3,rad=0.05",
     )
 

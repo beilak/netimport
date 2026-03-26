@@ -37,9 +37,9 @@ What is missing is the product layer around that core:
 - some config-loading gaps have been closed, but overall product hardening is still incomplete
 - some documentation still needs follow-up, but core CLI usage and supported visualizer modes are now documented
 - quality gates are now green, including strict typing for product code
-- test coverage for product behavior is much better, though visualizer/headless coverage still has room to grow
+- test coverage for product behavior is much better, including stronger visualizer/headless coverage
 
-Practical assessment: this has moved from a loose alpha/prototype toward a much more disciplined developer tool, but it is still not fully production-ready while metadata/docs still present it as alpha and visualizer testing remains limited.
+Practical assessment: this has moved from a loose alpha/prototype toward a much more disciplined developer tool, with most original production-hardening gaps now addressed.
 
 ## Checks Already Run
 
@@ -260,12 +260,12 @@ Implemented.
 - `poetry run ruff check .` passes
 - CI passes without manual caveats
 
-## P2. Test suite is too shallow
+## DONE. P2. Test suite is too shallow
 
 ### Status
 
-Partially improved. Core CLI/config/summary coverage exists, resolver edge-case
-coverage has been added, and visualizer/headless coverage now exists in:
+Implemented. Core CLI/config/summary coverage exists, resolver edge-case
+coverage has been added, and visualizer/headless coverage is now covered in:
 
 - `tests/test_resolver_imports.py`
 - `tests/test_graph_builder.py`
@@ -299,12 +299,12 @@ Coverage added since the original audit:
 - type-checking import filtering
 - visualizer render-preparation behavior
 - headless visualizer smoke coverage
+- supported layout coverage for each registered MPL backend layout
+- empty-graph Bokeh coverage
+- non-planar `planar_layout` contract coverage
+- non-mutation checks for visualizer draw paths
 
-Remaining gaps include:
-
-- weak demo tests outside the strict release gate
-
-Also, demo tests are weak:
+At audit time, demo tests were weak:
 
 - `example/tests/test_account.py::test_print()` is empty
 - some asserts only instantiate dataclasses without validating behavior
@@ -316,7 +316,7 @@ Also, demo tests are weak:
 
 ### Suggested implementation
 
-Add tests in layers:
+Implemented in layers:
 
 1. DONE. Unit tests for config loading.
 2. DONE. Unit tests for import resolution edge cases.
@@ -862,7 +862,7 @@ Product-positioning gaps from the original audit have now been addressed:
 - metadata no longer says alpha
 - README reads like a maintained beta-stage tool and documents its boundaries
 - docs can still be tightened further
-- visualizer/headless coverage is still thinner than the rest of the product
+- visualizer/headless coverage is now part of the maintained product test story
 
 This is no longer just a rough prototype. It is a much more disciplined tool
 that is approaching production readiness, with a smaller and clearer remaining

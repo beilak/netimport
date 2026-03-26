@@ -3,6 +3,8 @@ from typing import TYPE_CHECKING, cast
 import networkx as nx
 import pytest
 from _pytest.monkeypatch import MonkeyPatch
+from bokeh.models import HoverTool, PointDrawTool
+from bokeh.models.annotations import Arrow
 from bokeh.models.renderers import GraphRenderer
 
 from netimport_lib.visualizer import bokeh_plotter_v2
@@ -78,6 +80,29 @@ def test_prepare_bokeh_render_rejects_unsupported_layout() -> None:
         bokeh_plotter_v2.prepare_bokeh_render(graph, "spring")
 
 
+def test_prepare_bokeh_render_handles_empty_graph() -> None:
+    graph = nx.DiGraph()
+
+    render_data = bokeh_plotter_v2.prepare_bokeh_render(graph, "constrained")
+
+    assert render_data.final_positions == {}
+    assert render_data.folder_rect_data == {
+        "x": [],
+        "y": [],
+        "width": [],
+        "height": [],
+        "name": [],
+        "color": [],
+    }
+    assert render_data.arrow_source_data == {
+        "start_x": [],
+        "start_y": [],
+        "end_x": [],
+        "end_y": [],
+    }
+    assert render_data.node_visual_data == {}
+
+
 def test_draw_bokeh_graph_smoke_headless_without_mutating_input(
     monkeypatch: MonkeyPatch,
 ) -> None:
@@ -92,3 +117,33 @@ def test_draw_bokeh_graph_smoke_headless_without_mutating_input(
     assert len(shown_plots) == 1
     assert len(shown_plot.select({"type": GraphRenderer})) == 1
     assert "viz_size" not in graph.nodes["pkg/a.py"]
+
+
+def test_draw_bokeh_graph_configures_headless_plot_contract(
+    monkeypatch: MonkeyPatch,
+) -> None:
+    graph = _build_sample_graph()
+    shown_plots: list[object] = []
+
+    monkeypatch.setattr(bokeh_plotter_v2, "show", lambda plot: shown_plots.append(plot))
+
+    bokeh_plotter_v2.draw_bokeh_graph(graph, "constrained")
+
+    shown_plot = cast("figure_model", shown_plots[0])
+    hover_tool = cast("HoverTool", shown_plot.select_one({"type": HoverTool}))
+    drag_tool = cast("PointDrawTool", shown_plot.select_one({"type": PointDrawTool}))
+
+    assert hover_tool.tooltips == [
+        ("Name", "@viz_label"),
+        ("Type", "@viz_type"),
+        ("Total Links", "@total_degree"),
+        ("Incoming", "@in_degree"),
+        ("Outgoing", "@out_degree"),
+        ("ID", "@index"),
+        ("Folder", "@folder"),
+    ]
+    assert hover_tool.renderers is not None
+    assert len(hover_tool.renderers) == 1
+    assert drag_tool.renderers is not None
+    assert len(drag_tool.renderers) == 1
+    assert len(shown_plot.select({"type": Arrow})) == 1

@@ -93,7 +93,14 @@ def _build_layout_positions(graph: nx.DiGraph, layout: str) -> dict[object, Node
             f"Unsupported Matplotlib layout '{layout}'. Supported layouts: {supported_layouts}."
         ) from exc
 
-    return _normalize_layout_positions(layout_builder(graph))
+    try:
+        return _normalize_layout_positions(layout_builder(graph))
+    except nx.NetworkXException as exc:
+        if layout != "planar_layout":
+            raise
+        raise ValueError(
+            "Matplotlib layout 'planar_layout' requires a planar graph."
+        ) from exc
 
 
 def prepare_mpl_render(graph: nx.DiGraph, layout: str) -> PreparedMplRender:

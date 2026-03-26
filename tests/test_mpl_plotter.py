@@ -17,6 +17,18 @@ def _build_sample_graph() -> nx.DiGraph:
     return graph
 
 
+def _build_non_planar_graph() -> nx.DiGraph:
+    graph = nx.DiGraph()
+    left_partition = ("a", "b", "c")
+    right_partition = ("x", "y", "z")
+
+    for left_node in left_partition:
+        for right_node in right_partition:
+            graph.add_edge(left_node, right_node)
+
+    return graph
+
+
 def test_prepare_mpl_render_builds_expected_visual_data() -> None:
     graph = _build_sample_graph()
 
@@ -54,6 +66,25 @@ def test_prepare_mpl_render_rejects_unsupported_layout() -> None:
         mpl_plotter.prepare_mpl_render(graph, "grid")
 
 
+@pytest.mark.parametrize("layout", ("spring", "circular", "shell", "planar_layout"))
+def test_prepare_mpl_render_supports_each_registered_layout(layout: str) -> None:
+    graph = _build_sample_graph()
+
+    render_data = mpl_plotter.prepare_mpl_render(graph, layout)
+
+    assert set(render_data.positions) == set(graph.nodes())
+
+
+def test_prepare_mpl_render_rejects_non_planar_graph_for_planar_layout() -> None:
+    graph = _build_non_planar_graph()
+
+    with pytest.raises(
+        ValueError,
+        match="Matplotlib layout 'planar_layout' requires a planar graph.",
+    ):
+        mpl_plotter.prepare_mpl_render(graph, "planar_layout")
+
+
 def test_draw_graph_mpl_smoke_headless(monkeypatch: MonkeyPatch) -> None:
     graph = _build_sample_graph()
     shown: list[str] = []
@@ -64,4 +95,22 @@ def test_draw_graph_mpl_smoke_headless(monkeypatch: MonkeyPatch) -> None:
     mpl_plotter.draw_graph_mpl(graph, "spring")
 
     assert shown == ["show"]
+    plt.close("all")
+
+
+def test_draw_graph_mpl_does_not_mutate_input_graph(monkeypatch: MonkeyPatch) -> None:
+    graph = _build_sample_graph()
+    before_node_data = {
+        node_id: dict(node_data) for node_id, node_data in graph.nodes(data=True)
+    }
+
+    plt.switch_backend("Agg")
+    monkeypatch.setattr(plt, "show", lambda: None)
+
+    mpl_plotter.draw_graph_mpl(graph, "shell")
+
+    after_node_data = {
+        node_id: dict(node_data) for node_id, node_data in graph.nodes(data=True)
+    }
+    assert after_node_data == before_node_data
     plt.close("all")

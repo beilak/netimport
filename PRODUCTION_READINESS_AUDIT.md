@@ -55,12 +55,13 @@ The following checks were run during audit:
 
 Observed results:
 
-- `pytest` now passes: `36 passed`
+- `pytest` now passes: `46 passed`
 - `mypy .` now passes in strict mode
 - `ruff check .` now passes
 - CLI help works
 - `netimport example` exits successfully
 - `netimport example --show-console-summary` now prints a deterministic console report
+- `netimport example --show-console-summary --summary-format json --no-show-graph` now prints a deterministic JSON report
 - `python -m netimport_lib.cli --help` now works
 
 ## Problems
@@ -151,6 +152,31 @@ Implemented in `netimport_lib/summary_builder.py` and covered by tests.
 - `poetry run netimport example --show-console-summary` prints a meaningful report
 - output is deterministic
 - tests assert exact lines for formatter and CLI output
+
+## DONE. P2. JSON summary output is available for automation
+
+### Status
+
+Implemented in `netimport_lib/summary_builder.py`, `netimport_lib/cli.py`,
+`tests/test_summary_builder.py`, `tests/test_cli.py`, and documented in
+`README.md`.
+
+### Done
+
+1. Added a structured summary payload builder for machine-readable output.
+2. Added deterministic JSON serialization for the summary report.
+3. Added CLI support via `--summary-format json` alongside the existing
+   `--show-console-summary` flow.
+4. Preserved the existing text summary contract as the default behavior.
+5. Added unit and CLI tests for JSON summary output.
+6. Documented the JSON summary mode for CI and automation use cases.
+
+### Acceptance criteria
+
+- `netimport <project> --show-console-summary --summary-format json --no-show-graph`
+  prints valid deterministic JSON
+- existing text summary behavior remains unchanged
+- tests cover both formatter-level and CLI-level JSON output
 
 ## DONE. P1. README and actual CLI contract are aligned
 
@@ -560,15 +586,33 @@ This section is the implementation backlog for another LLM or engineer.
 - Prefer small pure functions in config loading so tests stay simple.
 - Use `click.testing.CliRunner` for CLI tests.
 
-## Workstream 2. Implement useful non-GUI output
+## DONE. Workstream 2. Implement useful non-GUI output
+
+### Status
+
+Implemented in:
+
+- `netimport_lib/summary_builder.py`
+- `netimport_lib/cli.py`
+- `tests/test_summary_builder.py`
+- `tests/test_cli.py`
+- `README.md`
+
+### Done
+
+1. Finished `summary_builder.py`.
+2. Kept unresolved imports visible in the summary output.
+3. Added deterministic sorting for printed and structured summary sections.
+4. Added integration tests for CLI summary output.
+5. Added deterministic JSON summary output for CI and automation.
 
 ### Tasks
 
-1. Finish `summary_builder.py`.
-2. Decide whether unresolved imports should appear in graph and summary.
-3. Add deterministic sorting for all printed sections.
-4. Add integration tests for CLI summary.
-5. If production CI use is a goal, strongly consider adding JSON output.
+1. DONE. Finish `summary_builder.py`.
+2. DONE. Decide whether unresolved imports should appear in graph and summary.
+3. DONE. Add deterministic sorting for all printed sections.
+4. DONE. Add integration tests for CLI summary.
+5. DONE. Add JSON output for CI and automation.
 
 ### Files likely to change
 
@@ -730,7 +774,7 @@ Recommended order for another LLM:
 5. Refactor and type-fix visualizers.
 6. Make `mypy` and `ruff` green.
 7. Revisit demo-folder policy.
-8. Add optional production features such as JSON/DOT/Mermaid export and CI-oriented failure modes.
+8. Add optional production features such as DOT/Mermaid export and CI-oriented failure modes.
 
 This order reduces rework because config + summary + tests create the base contract first.
 
@@ -754,16 +798,15 @@ The project can be reconsidered as production-ready only when all of the followi
 
 These are not the first blockers, but they would materially improve the tool:
 
-1. JSON export for CI tooling.
-2. DOT and Mermaid export.
-3. Architecture metrics:
+1. DOT and Mermaid export.
+2. Architecture metrics:
    - afferent coupling
    - efferent coupling
    - instability
-4. Layer/rule validation.
-5. Exit codes that fail CI based on violations.
-6. HTML report output.
-7. Performance profiling on large repos.
+3. Layer/rule validation.
+4. Exit codes that fail CI based on violations.
+5. HTML report output.
+6. Performance profiling on large repos.
 
 ## Final Assessment
 

@@ -20,7 +20,7 @@ The repository also contains demo projects:
 - `example/`
 - `big_example/`
 
-These examples are useful for manual testing, but they currently blur the line between library code and demo code in CI and quality checks.
+These examples are useful for manual testing. They are now treated as demos/fixtures and are excluded from strict release gates so they do not blur product readiness signals.
 
 ## Current State Summary
 
@@ -36,10 +36,10 @@ What is missing is the product layer around that core:
 
 - some config-loading gaps have been closed, but overall product hardening is still incomplete
 - some documentation still needs follow-up, but core CLI usage and supported visualizer modes are now documented
-- type checks and lints are not green
-- test coverage is too shallow for a production CLI tool
+- quality gates are now green, including strict typing for product code
+- test coverage for product behavior is much better, though visualizer/headless coverage still has room to grow
 
-Practical assessment: this is a useful alpha/prototype, not yet a production-ready tool.
+Practical assessment: this has moved from a loose alpha/prototype toward a much more disciplined developer tool, but it is still not fully production-ready while metadata/docs still present it as alpha and visualizer testing remains limited.
 
 ## Checks Already Run
 
@@ -55,12 +55,13 @@ The following checks were run during audit:
 
 Observed results:
 
-- `pytest` passed: `6 passed`
-- `mypy` failed with 31 errors
-- `ruff` failed with 16 findings
+- `pytest` now passes: `36 passed`
+- `mypy .` now passes in strict mode
+- `ruff check .` now passes
 - CLI help works
 - `netimport example` exits successfully
 - `netimport example --show-console-summary` now prints a deterministic console report
+- `python -m netimport_lib.cli --help` now works
 
 ## Problems
 
@@ -174,7 +175,26 @@ Implemented in `netimport_lib/summary_builder.py` and covered by tests.
 - `README.md` and `netimport --help` describe the same interface for current supported options
 - examples reflect the real command behavior
 
-## P1. Quality gates are not green
+## DONE. P1. Quality gates are not green
+
+### Status
+
+Implemented in `pyproject.toml`, `.github/workflows/ci.yml`, `netimport_lib/`,
+`tests/`, and local stub files under `stubs/`.
+
+### Done
+
+1. Made `mypy` pass in strict mode for product code.
+2. Added local typing stubs for dependencies that do not provide enough type information for strict checking.
+3. Tightened `ruff` configuration and cleaned product code to pass strict linting.
+4. Refactored several modules to reduce complexity instead of hiding warnings.
+5. Excluded `example/` and `big_example/` from strict release gates and made that policy explicit in config.
+6. Aligned CI with the intended product-quality scope.
+7. Verified:
+   - `poetry run mypy .`
+   - `poetry run ruff check .`
+   - `poetry run pytest`
+   all pass.
 
 ### Why it matters
 
@@ -188,31 +208,25 @@ The repository has CI for `ruff`, `mypy`, and `pytest`. A production-ready tool 
 
 ### Evidence from audit
 
-`poetry run mypy .` reported 31 errors, including:
+Initial audit state:
 
-- `netimport_lib/imports_reader.py`
-- `netimport_lib/config_loader.py`
-- `netimport_lib/graph_builder/resolver_imports.py`
-- `netimport_lib/visualizer/bokeh_plotter_v2.py`
+- `poetry run mypy .` reported 31 errors
+- `poetry run ruff check .` reported 16 issues
 
-`poetry run ruff check .` reported 16 issues, including:
+Current verified state:
 
-- complexity warnings in graph building / resolver / visualizer code
-- broad exception swallowing
-- unused arguments
-- commented-out code in demo files
+- `poetry run mypy .` passes
+- `poetry run ruff check .` passes
+- `poetry run pytest` passes
 
 ### Consequence
 
-- CI will fail or cannot be trusted as a release gate
-- type regressions can slip into graph and visualizer logic
+- CI quality gates are now trustworthy again for the maintained product scope
+- strict typing now protects graph, config, CLI, and visualizer boundaries more effectively
 
 ### Suggested implementation
 
-1. Fix genuine code issues first.
-2. Revisit `mypy` configuration for third-party stubs if needed.
-3. Reduce complexity in large functions instead of silencing rules blindly.
-4. Decide whether demo folders belong in the strict quality path.
+Implemented.
 
 ### Acceptance criteria
 
@@ -305,7 +319,7 @@ Implemented in `netimport_lib/visualizer/__init__.py`, `netimport_lib/visualizer
 5. Made CLI layout resolution backend-aware, including backend-specific default layouts.
 6. Rejected unsupported backend/layout combinations with a clear CLI error instead of silently falling back.
 7. Made Bokeh use an explicit supported layout contract instead of ignoring the `layout` argument.
-8. Kept `plotly_plotter.py` out of the public backend list until it is explicitly supported.
+8. Removed the hidden Plotly backend code path and dropped the unused `plotly` dependency so the shipped package matches the public backend contract.
 9. Added CLI and registry tests covering:
    - backend defaults
    - supported combinations
@@ -328,7 +342,7 @@ Users choose layouts and visualization mode from CLI. Those options should behav
 
 - Bokeh visualizer ignores the `layout` argument entirely.
 - CLI offers graphviz-like layout names (`dot`, `neato`, `fdp`, `sfdp`), but MPL path does not implement those layouts and silently falls back to `spring_layout`.
-- `plotly_plotter.py` exists but is not exposed in `GRAPH_VISUALIZERS`.
+- At audit time, `plotly_plotter.py` existed but was not exposed in `GRAPH_VISUALIZERS`.
 
 ### Consequence
 
@@ -348,7 +362,16 @@ Users choose layouts and visualization mode from CLI. Those options should behav
 - each CLI layout option is either supported or rejected with a clear message
 - visualizer backend list matches actual implementation
 
-## P2. `python -m netimport_lib.cli` is a no-op
+## DONE. P2. `python -m netimport_lib.cli` is a no-op
+
+### Status
+
+Implemented in `netimport_lib/cli.py` and verified manually.
+
+### Done
+
+1. Added `if __name__ == "__main__": main()`.
+2. Verified `poetry run python -m netimport_lib.cli --help` works.
 
 ### Why it matters
 
@@ -360,32 +383,43 @@ Package entry point `netimport` works, but module execution does nothing because
 
 ### Consequence
 
-- not a blocker for packaged entry point
-- but confusing for developers and tests
+- module execution is now supported explicitly
+- developer behavior matches user expectations better
 
 ### Suggested implementation
 
-Add:
-
-```python
-if __name__ == "__main__":
-    main()
-```
-
-Only do this if module execution is intended to be supported.
+Implemented.
 
 ### Acceptance criteria
 
 - either module execution works, or docs clearly say only `netimport` entry point is supported
 
-## P2. Complex functions need decomposition
+## DONE. P2. Complex functions need decomposition
 
 ### Status
 
-Partially improved. `netimport_lib/graph_builder/graph_builder.py` and
-`netimport_lib/graph_builder/resolver_imports.py` have been decomposed into
-smaller helpers and now pass targeted Ruff complexity checks. The Bokeh
-visualizer still needs the same treatment.
+Implemented in `netimport_lib/graph_builder/graph_builder.py`,
+`netimport_lib/graph_builder/resolver_imports.py`, and
+`netimport_lib/visualizer/bokeh_plotter_v2.py`.
+
+### Done
+
+1. Kept resolver logic split across focused helpers for:
+   - relative import resolution
+   - absolute import resolution
+   - stdlib/external classification
+2. Kept graph building split across:
+   - source normalization
+   - project-node creation
+   - target-node/edge insertion
+   - metadata enrichment
+3. Decomposed the Bokeh visualizer into smaller steps for:
+   - constrained layout generation
+   - folder overlays
+   - node/edge renderer configuration
+   - hover and arrow setup
+   - drag support
+4. Verified the refactored code still passes strict typing, linting, and tests.
 
 ### Why it matters
 
@@ -404,18 +438,25 @@ The graph builder, resolver, and Bokeh visualizer have high complexity and are g
 
 ### Suggested implementation
 
-Refactor into smaller units, for example:
-
-- DONE. resolver: split relative import resolution, absolute import resolution, stdlib/external classification
-- DONE. graph builder: split node initialization, edge insertion, node metadata enrichment
-- Bokeh plotter: split layout generation, node styling, edge styling, hover config
+Implemented.
 
 ### Acceptance criteria
 
 - complexity warnings are gone or reduced to an acceptable level
 - behavior is preserved by tests
 
-## P2. Demo code leaks into quality story
+## DONE. P2. Demo code leaks into quality story
+
+### Status
+
+Implemented in `pyproject.toml` and `.github/workflows/ci.yml`.
+
+### Done
+
+1. Chose an explicit policy: `example/` and `big_example/` are demos/fixtures, not release-gated production code.
+2. Excluded demo folders from strict `mypy` and `ruff` quality gates.
+3. Scoped `pytest` to the maintained product test suite under `tests/`.
+4. Aligned CI commands with that same maintenance intent.
 
 ### Why it matters
 
@@ -437,15 +478,11 @@ Ruff findings include demo files such as:
 
 ### Suggested implementation
 
-Choose one strategy:
+Implemented with strategy 2:
 
-1. Treat demos as production-quality examples:
-   - lint/type/test them fully
-2. Treat demos as fixtures:
-   - exclude them from strict gates
-   - keep them simple and intentionally non-production
-
-Recommendation: decide explicitly and encode the choice in config.
+1. Treat demos as fixtures.
+2. Exclude them from strict gates.
+3. Keep the release-quality signal focused on maintained product code.
 
 ### Acceptance criteria
 
@@ -494,7 +531,7 @@ This section is the implementation backlog for another LLM or engineer.
 4. DONE. Apply `ignored_files`.
 5. Add `--config` support if the README contract should be preserved.
 6. Decide whether `--show-console-summary` should default to `False` instead of `True`.
-7. Add `__main__` support if desired.
+7. DONE. Add `__main__` support.
 
 ### Files likely to change
 
@@ -581,11 +618,18 @@ Implemented in:
 
 ## Workstream 4. Fix visualizer boundaries
 
+### Status
+
+Partially implemented. Supported backends/layouts are explicit, unsupported
+combinations fail clearly, and the hidden Plotly backend path has been removed
+from both the shipped code and package dependencies. Remaining follow-up is
+separating graph generation from side-effectful rendering.
+
 ### Tasks
 
 1. DONE. Decide supported backends: `bokeh`, `mpl`, maybe `plotly`.
 2. DONE. Decide supported layouts per backend.
-3. Remove or implement dead/hidden code paths.
+3. DONE. Remove or implement dead/hidden code paths.
 4. DONE. Make unsupported layout/backend combinations fail clearly.
 5. Consider separating graph generation from side-effectful rendering.
 
@@ -604,13 +648,23 @@ Implemented in:
 
 ## Workstream 5. Restore trust in quality gates
 
+### Status
+
+Implemented in:
+
+- `pyproject.toml`
+- `.github/workflows/ci.yml`
+- `stubs/`
+- multiple files under `netimport_lib/`
+- multiple files under `tests/`
+
 ### Tasks
 
-1. Make `mypy` pass.
-2. Make `ruff check .` pass.
-3. Reduce complexity by refactoring, not by hiding warnings everywhere.
-4. Decide policy for demo folders in lint/type checks.
-5. Keep CI aligned with local developer commands.
+1. DONE. Make `mypy` pass.
+2. DONE. Make `ruff check .` pass.
+3. DONE. Reduce complexity by refactoring, not by hiding warnings everywhere.
+4. DONE. Decide policy for demo folders in lint/type checks.
+5. DONE. Keep CI aligned with local developer commands.
 
 ### Files likely to change
 
@@ -628,8 +682,9 @@ Implemented in:
 ### Status
 
 Partially implemented. Core product behavior is now covered for config loading,
-CLI behavior, summary output, and resolver edge cases. Demo tests still need
-review.
+CLI behavior, summary output, resolver edge cases, and strict typing. Demo tests
+are intentionally outside the strict release gate, but visualizer behavior in
+headless environments still needs deeper coverage.
 
 ### Tasks
 
@@ -705,4 +760,21 @@ NetImport already contains a usable core for parsing imports and building a depe
 - green quality gates
 - real coverage of user-facing scenarios
 
-Once those are fixed, the project can move from alpha prototype toward a dependable developer tool.
+Most of those hardening items are now fixed. The project has materially improved:
+
+- quality gates are green
+- strict typing is in place for maintained product code
+- CLI module execution works
+- the demo-folder policy is explicit
+- product-facing tests are significantly stronger
+
+The main remaining gap is no longer core implementation hygiene, but product
+positioning and release confidence:
+
+- metadata still says alpha
+- docs can still be tightened further
+- visualizer/headless coverage is still thinner than the rest of the product
+
+This is no longer just a rough prototype. It is a much more disciplined tool
+that is approaching production readiness, with a smaller and clearer remaining
+backlog.

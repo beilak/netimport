@@ -1,0 +1,3 @@
+from typing import IO
+
+def load(fp: IO[str]) -> dict[str, object]: ...

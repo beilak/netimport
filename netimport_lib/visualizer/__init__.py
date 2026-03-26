@@ -1,5 +1,8 @@
+"""Visualizer registry and contracts."""
+
 from collections.abc import Callable
 from dataclasses import dataclass
+from typing import Final
 
 import networkx as nx
 
@@ -9,24 +12,25 @@ from netimport_lib.visualizer.mpl_plotter import draw_graph_mpl
 
 GraphRenderFunc = Callable[[nx.DiGraph, str], None]
 
-MPL_LAYOUTS: tuple[str, ...] = (
-    "spring",
-    "circular",
-    "shell",
-    "planar_layout",
-)
-BOKEH_LAYOUTS: tuple[str, ...] = ("constrained",)
 
-
-@dataclass(frozen=True)
+@dataclass(frozen=True, slots=True)
 class GraphVisualizer:
+    """Description of a supported graph visualizer backend."""
+
     name: str
     render: GraphRenderFunc
     supported_layouts: tuple[str, ...]
     default_layout: str
 
 
-GRAPH_VISUALIZERS: dict[str, GraphVisualizer] = {
+MPL_LAYOUTS: Final[tuple[str, ...]] = (
+    "spring",
+    "circular",
+    "shell",
+    "planar_layout",
+)
+BOKEH_LAYOUTS: Final[tuple[str, ...]] = ("constrained",)
+GRAPH_VISUALIZERS: Final[dict[str, GraphVisualizer]] = {
     "bokeh": GraphVisualizer(
         name="bokeh",
         render=draw_bokeh_graph,
@@ -40,13 +44,22 @@ GRAPH_VISUALIZERS: dict[str, GraphVisualizer] = {
         default_layout="spring",
     ),
 }
-
-DEFAULT_VISUALIZER = "bokeh"
-GRAPH_VISUALIZER_NAMES: tuple[str, ...] = tuple(GRAPH_VISUALIZERS)
-GRAPH_LAYOUT_CHOICES: tuple[str, ...] = tuple(
+DEFAULT_VISUALIZER: Final[str] = "bokeh"
+GRAPH_VISUALIZER_NAMES: Final[tuple[str, ...]] = tuple(GRAPH_VISUALIZERS)
+GRAPH_LAYOUT_CHOICES: Final[tuple[str, ...]] = tuple(
     dict.fromkeys(
         layout_name
         for visualizer in GRAPH_VISUALIZERS.values()
         for layout_name in visualizer.supported_layouts
     )
 )
+
+__all__ = [
+    "BOKEH_LAYOUTS",
+    "DEFAULT_VISUALIZER",
+    "GRAPH_LAYOUT_CHOICES",
+    "GRAPH_VISUALIZERS",
+    "GRAPH_VISUALIZER_NAMES",
+    "MPL_LAYOUTS",
+    "GraphVisualizer",
+]

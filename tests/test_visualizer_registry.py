@@ -12,7 +12,7 @@ def test_visualizer_registry_has_expected_public_backends() -> None:
 
 
 def test_visualizer_defaults_are_supported_and_public_layouts_match_registry() -> None:
-    public_layouts_from_registry = []
+    public_layouts_from_registry: list[str] = []
 
     for visualizer in GRAPH_VISUALIZERS.values():
         assert visualizer.default_layout in visualizer.supported_layouts

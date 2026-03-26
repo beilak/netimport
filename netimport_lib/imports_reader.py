@@ -1,145 +1,91 @@
+"""AST-based import extraction for Python source files."""
+
 import ast
+from dataclasses import dataclass
 from pathlib import Path
 
 
-class ImportItem:
-    def __init__(
-        self,
-        module_path: str | None,
-        name: str | None,
-        alias: str | None,
-        level: int,
-        lineno: int,
-        col_offset: int,
-        is_type_checking: bool = False,
-    ) -> None:
-        self.module_path = module_path
-        self.name = name
-        self.alias = alias
-        self.level = level
-        self.lineno = lineno
-        self.col_offset = col_offset
-        self.is_type_checking = is_type_checking
-
-    def __repr__(self) -> str:
-        return (
-            f"ImportItem(module_path={self.module_path!r}, name={self.name!r}, "
-            f"alias={self.alias!r}, level={self.level}, L{self.lineno}, "
-            f"type_checking={self.is_type_checking})"
-        )
+@dataclass(frozen=True, slots=True)
+class _ImportItem:
+    module_path: str | None
+    name: str | None
+    level: int
+    is_type_checking: bool = False
 
     @property
     def full_imported_name(self) -> str:
-        """Return str for imported name.
-
-        - "os" for `import os`
-        - "package.module" for `import package.module`
-        - "package.module.name" for `from package.module import name`
-        - ".sibling" for `from . import sibling`
-        - ".module.name" for `from .module import name`
-        - "package" for `from package import *`
-        - "." for `from . import *`.
-        """
         prefix = "." * self.level
 
-        # Case 1: from ... import name
         if self.name and self.name != "*":
             if self.module_path:
                 return f"{prefix}{self.module_path}.{self.name}"
             return f"{prefix}{self.name}"
 
-        # Case 2: import module.path OR from module.path import *
-        if self.module_path:  # e.g. "os", "package.module"
+        if self.module_path:
             return f"{prefix}{self.module_path}"
 
-        # Case 3: from . import * (или from .. import *, и т.д.)
-        if self.name == "*" and not self.module_path and self.level > 0:
-            return prefix  # "." or ".."
-
-        # Case 4 from . import (без имени и без *)
-        if not self.module_path and not self.name and self.level > 0:
+        if self.level > 0:
             return prefix
 
         return ""
 
 
-class ImportVisitor(ast.NodeVisitor):
-    def __init__(self, file_path: str) -> None:
-        self.file_path = file_path
-        self.imports: list[ImportItem] = []
+class _ImportVisitor(ast.NodeVisitor):
+    def __init__(self) -> None:
+        self.imports: list[_ImportItem] = []
         self._in_type_checking_block = False
 
     def _extract_imports(
         self,
         node_names: list[ast.alias],
         module_base: str | None,
+        *,
         level: int,
-        lineno: int,
-        col_offset: int,
     ) -> None:
         for alias_node in node_names:
             imported_name = alias_node.name
-            alias = alias_node.asname
 
             current_module_path: str | None
             current_name: str | None
 
-            if module_base is None:  # for `import foo` or `import foo.bar`
+            if module_base is None and level == 0:
                 current_module_path = imported_name
                 current_name = None
-            else:  # for `from foo import bar`
+            else:
                 current_module_path = module_base
                 current_name = imported_name
 
             self.imports.append(
-                ImportItem(
+                _ImportItem(
                     module_path=current_module_path,
                     name=current_name,
-                    alias=alias,
                     level=level,
-                    lineno=lineno,
-                    col_offset=col_offset,
                     is_type_checking=self._in_type_checking_block,
                 )
             )
 
     def visit_Import(self, node: ast.Import) -> None:
-        self._extract_imports(
-            node.names,
-            module_base=None,
-            level=0,
-            lineno=node.lineno,
-            col_offset=node.col_offset,
-        )
+        self._extract_imports(node.names, None, level=0)
         self.generic_visit(node)
 
     def visit_ImportFrom(self, node: ast.ImportFrom) -> None:
-        module_base = node.module if node.module else ""
-        level = node.level
-        self._extract_imports(
-            node.names,
-            module_base=module_base,
-            level=level,
-            lineno=node.lineno,
-            col_offset=node.col_offset,
-        )
+        self._extract_imports(node.names, node.module, level=node.level)
         self.generic_visit(node)
 
     def visit_If(self, node: ast.If) -> None:
         is_type_checking_if = _is_type_checking_test(node.test)
+        previous_state = self._in_type_checking_block
 
-        original_in_type_checking_block = self._in_type_checking_block
         if is_type_checking_if:
             self._in_type_checking_block = True
 
-        for stmt in node.body:
-            self.visit(stmt)
+        for statement in node.body:
+            self.visit(statement)
 
-        if is_type_checking_if:
-            self._in_type_checking_block = original_in_type_checking_block
+        self._in_type_checking_block = previous_state
 
-        for stmt in node.orelse:
-            self.visit(stmt)
+        for statement in node.orelse:
+            self.visit(statement)
 
 
 def _is_type_checking_test(node: ast.expr) -> bool:
@@ -150,30 +96,29 @@ def _is_type_checking_test(node: ast.expr) -> bool:
     return False
 
 
-def get_imported_modules_as_strings(file_path: str, include_type_checking_imports: bool = False) -> list[str]:
+def get_imported_modules_as_strings(
+    file_path: str,
+    include_type_checking_imports: bool = False,
+) -> list[str]:
+    """Return imported module names extracted from a Python file."""
     path = Path(file_path)
     if not path.exists() or not path.is_file():
         return []
 
     try:
-        with path.open(encoding="utf-8") as f:
-            source_code = f.read()
-
+        source_code = path.read_text(encoding="utf-8")
         tree = ast.parse(source_code, filename=file_path)
-
-    except SyntaxError:
+    except (OSError, SyntaxError, UnicodeDecodeError):
         return []
 
-    visitor = ImportVisitor(file_path)
+    visitor = _ImportVisitor()
     visitor.visit(tree)
 
-    imported_module_names: list[str] = []
-    for imp_item in visitor.imports:
-        if not include_type_checking_imports and imp_item.is_type_checking:
-            continue
-
-        full_name = imp_item.full_imported_name
-        if full_name:
-            imported_module_names.append(full_name)
+    imported_module_names = [
+        import_item.full_imported_name
+        for import_item in visitor.imports
+        if include_type_checking_imports or not import_item.is_type_checking
+        if import_item.full_imported_name
+    ]
 
     return sorted(imported_module_names)

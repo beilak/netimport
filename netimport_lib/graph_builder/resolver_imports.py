@@ -1,30 +1,50 @@
+"""Import string resolution for dependency graph nodes."""
+
 import sys
+from dataclasses import dataclass
 from pathlib import Path
-from typing import NamedTuple
+from typing import Final, Literal, TypeAlias
 
 
-def get_standard_library_modules() -> set[str]:
+NodeType: TypeAlias = Literal[
+    "project_file",
+    "std_lib",
+    "external_lib",
+    "unresolved",
+    "unresolved_relative",
+    "unresolved_relative_internal_error",
+    "unresolved_relative_too_many_dots",
+]
+
+
+def _get_standard_library_modules() -> frozenset[str]:
     if hasattr(sys, "stdlib_module_names"):
-        return set(sys.stdlib_module_names)
-    return set()
+        return frozenset(sys.stdlib_module_names)
+    return frozenset()
 
 
-STANDARD_LIB_MODULES = get_standard_library_modules()
+STANDARD_LIB_MODULES: Final[frozenset[str]] = _get_standard_library_modules()
+
+
+@dataclass(frozen=True, slots=True)
+class NodeInfo:
+    """Resolved graph node metadata for an import string."""
+
+    id: str
+    type: NodeType
 
 
 def normalize_path(path: str, project_root: str | None = None) -> str:
+    """Normalize a path and optionally make it relative to a project root."""
     abs_path = Path(path).resolve()
-    if project_root:
+    if project_root is not None:
         abs_project_root = Path(project_root).resolve()
         try:
             return str(abs_path.relative_to(abs_project_root))
         except ValueError:
             pass
-    return str(abs_path)
 
-class NodeInfo(NamedTuple):
-    id: str | None
-    type: str
+    return str(abs_path)
 
 
 def _resolve_existing_path(candidate_path: Path, project_files_normalized: set[str]) -> str | None:
@@ -47,6 +67,7 @@ def _resolve_module_from_base(
         resolved_path = _resolve_existing_path(candidate_path, project_files_normalized)
         if resolved_path is not None:
             return resolved_path
+
     return None
 
 
@@ -66,6 +87,7 @@ def _resolve_longest_project_prefix(
         )
         if resolved_path is not None:
             return resolved_path
+
     return None
 
 
@@ -74,6 +96,7 @@ def _split_relative_import(import_str: str) -> tuple[int, tuple[str, ...]]:
     num_dots = len(import_str) - len(stripped_import)
     if not stripped_import:
         return num_dots, ()
+
     return num_dots, tuple(part for part in stripped_import.split(".") if part)
 
 
@@ -81,7 +104,7 @@ def _build_relative_base_dir(
     source_file_path_normalized: str,
     project_root: str,
     num_dots: int,
-) -> tuple[Path | None, str | None]:
+) -> tuple[Path | None, NodeType | None]:
     project_root_path = Path(project_root).resolve()
     source_path = Path(source_file_path_normalized).resolve()
 
@@ -113,12 +136,17 @@ def _resolve_relative_import(
         project_root,
         num_dots,
     )
+
     if error_type is not None:
         return NodeInfo(import_str, error_type)
     if base_dir is None:
         return NodeInfo(import_str, "unresolved_relative_internal_error")
 
-    resolved_path = _resolve_longest_project_prefix(base_dir, module_path_parts, project_files_normalized)
+    resolved_path = _resolve_longest_project_prefix(
+        base_dir,
+        module_path_parts,
+        project_files_normalized,
+    )
     if resolved_path is not None:
         return NodeInfo(resolved_path, "project_file")
 
@@ -132,6 +160,9 @@ def _resolve_absolute_import(
 ) -> NodeInfo:
     project_root_path = Path(project_root).resolve()
     absolute_module_parts = tuple(part for part in import_str.split(".") if part)
+    if not absolute_module_parts:
+        return NodeInfo(import_str, "unresolved")
+
     resolved_path = _resolve_longest_project_prefix(
         project_root_path,
         absolute_module_parts,
@@ -153,6 +184,7 @@ def resolve_import_string(
     project_root: str,
     project_files_normalized: set[str],
 ) -> NodeInfo:
+    """Resolve an import string to a graph node."""
     if import_str.startswith("."):
         return _resolve_relative_import(
             import_str,
@@ -160,4 +192,5 @@ def resolve_import_string(
             project_root,
             project_files_normalized,
         )
+
     return _resolve_absolute_import(import_str, project_root, project_files_normalized)

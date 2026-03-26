@@ -1,102 +1,159 @@
+"""Bokeh-based graph rendering."""
+
 from collections import defaultdict
-from typing import Any
+from collections.abc import Mapping, Sequence
+from types import MappingProxyType
+from typing import Final, TypedDict, cast
 
 import networkx as nx
-from bokeh.models import (
-    Arrow,
-    Circle,
-    ColumnDataSource,
+from bokeh.models.annotations.arrows import Arrow, OpenHead
+from bokeh.models.annotations.labels import LabelSet
+from bokeh.models.glyphs import MultiLine, Scatter
+from bokeh.models.graphs import NodesAndLinkedEdges
+from bokeh.models.renderers import GraphRenderer
+from bokeh.models.sources import ColumnDataSource
+from bokeh.models.tools import (
+    BoxZoomTool,
     HoverTool,
-    LabelSet,
-    MultiLine,
-    NodesAndLinkedEdges,
-    OpenHead,
+    PanTool,
+    PointDrawTool,
+    ResetTool,
+    SaveTool,
+    TapTool,
+    WheelZoomTool,
 )
-from bokeh.plotting import figure, from_networkx, show
+from bokeh.plotting import from_networkx, show
+from bokeh.plotting._figure import figure as figure_model
 
 
-FREEZ_RANDOM_SEED = 42
-COLOR_MAP = {
-    "project_file": "skyblue",
-    "std_lib": "lightgreen",
-    "external_lib": "salmon",
-    "unresolved": "lightgray",
-    "unresolved_relative": "silver",
-}
-DEFAULT_NODE_COLOR = "red"
-MIN_NODE_SIZE_CONSTANT = 20
-LABEL_PADDING = 20
+class FolderRectData(TypedDict):
+    """Rectangular overlay data for folder groups."""
+
+    x: list[float]
+    y: list[float]
+    width: list[float]
+    height: list[float]
+    name: list[str]
+    color: list[str]
 
 
-def _collect_folder_nodes(graph: nx.DiGraph) -> tuple[defaultdict[str, list], list]:
-    folder_to_nodes: defaultdict[str, list] = defaultdict(list)
-    root_folder_nodes = []
+class ArrowSourceData(TypedDict):
+    """Arrow renderer coordinates."""
 
-    for node, data in graph.nodes(data=True):
-        if data.get("is_root_folder"):
-            root_folder_nodes.append(node)
+    start_x: list[float]
+    start_y: list[float]
+    end_x: list[float]
+    end_y: list[float]
+
+
+FREEZE_RANDOM_SEED: Final[int] = 42
+LABEL_PADDING: Final[float] = 20.0
+MIN_NODE_SIZE: Final[int] = 20
+COLOR_MAP: Final[Mapping[str, str]] = MappingProxyType(
+    {
+        "project_file": "skyblue",
+        "std_lib": "lightgreen",
+        "external_lib": "salmon",
+        "unresolved": "lightgray",
+        "unresolved_relative": "silver",
+        "unresolved_relative_internal_error": "silver",
+        "unresolved_relative_too_many_dots": "silver",
+    }
+)
+DEFAULT_NODE_COLOR: Final[str] = "red"
+
+
+def _normalize_layout_positions(
+    raw_positions: Mapping[str, Sequence[float]],
+) -> dict[str, tuple[float, float]]:
+    return {
+        node_id: (float(position[0]), float(position[1]))
+        for node_id, position in raw_positions.items()
+    }
+
+
+def _collect_folder_nodes(graph: nx.DiGraph) -> tuple[dict[str, list[str]], list[str]]:
+    folder_to_nodes: defaultdict[str, list[str]] = defaultdict(list)
+    root_folder_nodes: list[str] = []
+
+    for node_id, data in graph.nodes(data=True):
+        node_name = str(node_id)
+        folder_name = str(data.get("folder", ""))
+        if bool(data.get("is_root_folder", False)):
+            root_folder_nodes.append(node_name)
             continue
 
-        folder_to_nodes[data["folder"]].append(node)
+        folder_to_nodes[folder_name].append(node_name)
 
-    return folder_to_nodes, root_folder_nodes
+    return dict(folder_to_nodes), root_folder_nodes
 
 
-def _build_folder_graph(folder_to_nodes: defaultdict[str, list]) -> nx.Graph:
+def _build_folder_graph(folder_to_nodes: Mapping[str, Sequence[str]]) -> nx.Graph:
     folder_graph = nx.Graph()
-    all_folders = list(folder_to_nodes.keys())
+    all_folders = set(folder_to_nodes)
 
-    for folder in all_folders:
-        folder_graph.add_node(folder, label=folder.split("/")[-1])
-        parent_folder = "/".join(folder.split("/")[:-1])
+    for folder_name in all_folders:
+        folder_graph.add_node(folder_name, label=folder_name.split("/")[-1])
+        parent_folder = "/".join(folder_name.split("/")[:-1])
         if parent_folder in all_folders:
-            folder_graph.add_edge(parent_folder, folder)
+            folder_graph.add_edge(parent_folder, folder_name)
 
     return folder_graph
 
 
-def _build_folder_positions(folder_graph: nx.Graph, folder_layout_k: float) -> dict:
-    return nx.spring_layout(
-        folder_graph,
-        k=folder_layout_k,
-        iterations=100,
-        seed=FREEZ_RANDOM_SEED,
-        scale=20,
+def _build_folder_positions(
+    folder_graph: nx.Graph,
+    folder_layout_k: float,
+) -> dict[str, tuple[float, float]]:
+    return _normalize_layout_positions(
+        cast(
+            "Mapping[str, Sequence[float]]",
+            nx.spring_layout(
+                folder_graph,
+                k=folder_layout_k,
+                iterations=100,
+                seed=FREEZE_RANDOM_SEED,
+                scale=20,
+            ),
+        )
     )
 
 
 def _place_nodes_within_folders(
     graph: nx.DiGraph,
-    folder_to_nodes: defaultdict[str, list],
-    folder_pos: dict,
+    folder_to_nodes: Mapping[str, Sequence[str]],
+    folder_positions: Mapping[str, tuple[float, float]],
     node_layout_k: float,
-) -> dict:
-    final_pos = {}
+) -> dict[str, tuple[float, float]]:
+    final_positions: dict[str, tuple[float, float]] = {}
 
     for folder_name, nodes_in_folder in folder_to_nodes.items():
         subgraph = graph.subgraph(nodes_in_folder)
-        local_pos = nx.spring_layout(
-            subgraph,
-            k=node_layout_k,
-            iterations=50,
-            seed=FREEZ_RANDOM_SEED,
-            scale=1,
+        local_positions = _normalize_layout_positions(
+            cast(
+                "Mapping[str, Sequence[float]]",
+                nx.spring_layout(
+                    subgraph,
+                    k=node_layout_k,
+                    iterations=50,
+                    seed=FREEZE_RANDOM_SEED,
+                    scale=1,
+                ),
+            )
         )
+        folder_center_x, folder_center_y = folder_positions[folder_name]
+        for node_id, (x_coord, y_coord) in local_positions.items():
+            final_positions[node_id] = (x_coord + folder_center_x, y_coord + folder_center_y)
 
-        folder_center_x, folder_center_y = folder_pos[folder_name]
-        for node, (x, y) in local_pos.items():
-            final_pos[node] = (x + folder_center_x, y + folder_center_y)
-
-    return final_pos
+    return final_positions
 
 
 def _get_folder_and_child_nodes(
     folder_name: str,
-    folder_to_nodes: defaultdict[str, list],
-    sorted_folders: list[str],
-) -> list:
+    folder_to_nodes: Mapping[str, Sequence[str]],
+    sorted_folders: Sequence[str],
+) -> list[str]:
     all_child_nodes = list(folder_to_nodes[folder_name])
-
     for other_folder in sorted_folders:
         if other_folder.startswith(folder_name + "/"):
             all_child_nodes.extend(folder_to_nodes[other_folder])
@@ -105,23 +162,39 @@ def _get_folder_and_child_nodes(
 
 
 def _build_folder_rect_data(
-    folder_to_nodes: defaultdict[str, list],
-    final_pos: dict,
+    folder_to_nodes: Mapping[str, Sequence[str]],
+    final_positions: Mapping[str, tuple[float, float]],
+    *,
     padding: float = 1.0,
-) -> defaultdict[str, list]:
-    folder_rect_data: defaultdict[str, list] = defaultdict(list)
-    sorted_folders = sorted(folder_to_nodes.keys(), key=lambda folder_name: folder_name.count("/"), reverse=True)
+) -> FolderRectData:
+    folder_rect_data: FolderRectData = {
+        "x": [],
+        "y": [],
+        "width": [],
+        "height": [],
+        "name": [],
+        "color": [],
+    }
+    sorted_folders = sorted(
+        folder_to_nodes.keys(),
+        key=lambda folder_name: folder_name.count("/"),
+        reverse=True,
+    )
 
     for folder_name in sorted_folders:
         all_child_nodes = _get_folder_and_child_nodes(folder_name, folder_to_nodes, sorted_folders)
-        coords = [final_pos[node_id] for node_id in all_child_nodes]
+        coords = [
+            final_positions[node_id]
+            for node_id in all_child_nodes
+            if node_id in final_positions
+        ]
         if not coords:
             continue
 
-        min_x = min(c[0] for c in coords) - padding
-        max_x = max(c[0] for c in coords) + padding
-        min_y = min(c[1] for c in coords) - padding
-        max_y = max(c[1] for c in coords) + padding
+        min_x = min(x_coord for x_coord, _ in coords) - padding
+        max_x = max(x_coord for x_coord, _ in coords) + padding
+        min_y = min(y_coord for _, y_coord in coords) - padding
+        max_y = max(y_coord for _, y_coord in coords) + padding
 
         folder_rect_data["x"].append((min_x + max_x) / 2)
         folder_rect_data["y"].append((min_y + max_y) / 2)
@@ -135,85 +208,111 @@ def _build_folder_rect_data(
 
 def _add_root_folder_positions(
     graph: nx.DiGraph,
-    root_folder_nodes: list,
-    final_pos: dict,
+    root_folder_nodes: Sequence[str],
+    final_positions: dict[str, tuple[float, float]],
     node_layout_k: float,
 ) -> None:
     if not root_folder_nodes:
         return
 
     root_subgraph = graph.subgraph(root_folder_nodes)
-    root_pos = nx.spring_layout(
-        root_subgraph,
-        k=node_layout_k,
-        iterations=50,
-        seed=FREEZ_RANDOM_SEED,
-        scale=5,
-        center=(0, 0),
+    root_positions = _normalize_layout_positions(
+        cast(
+            "Mapping[str, Sequence[float]]",
+            nx.spring_layout(
+                root_subgraph,
+                k=node_layout_k,
+                iterations=50,
+                seed=FREEZE_RANDOM_SEED,
+                scale=5,
+                center=(0, 0),
+            ),
+        )
     )
-    final_pos.update(root_pos)
+    final_positions.update(root_positions)
 
 
-def create_constrained_layout(
-    graph: nx.DiGraph, folder_layout_k: float = 2, node_layout_k: float = 0.5
-) -> tuple[dict, dict]:
+def _create_constrained_layout(
+    graph: nx.DiGraph,
+    *,
+    folder_layout_k: float = 2,
+    node_layout_k: float = 0.5,
+) -> tuple[dict[str, tuple[float, float]], FolderRectData]:
     folder_to_nodes, root_folder_nodes = _collect_folder_nodes(graph)
     folder_graph = _build_folder_graph(folder_to_nodes)
-    folder_pos = _build_folder_positions(folder_graph, folder_layout_k)
-    final_pos = _place_nodes_within_folders(graph, folder_to_nodes, folder_pos, node_layout_k)
-    folder_rect_data = _build_folder_rect_data(folder_to_nodes, final_pos)
-    _add_root_folder_positions(graph, root_folder_nodes, final_pos, node_layout_k)
+    folder_positions = _build_folder_positions(folder_graph, folder_layout_k)
+    final_positions = _place_nodes_within_folders(
+        graph,
+        folder_to_nodes,
+        folder_positions,
+        node_layout_k,
+    )
+    folder_rect_data = _build_folder_rect_data(folder_to_nodes, final_positions)
+    _add_root_folder_positions(graph, root_folder_nodes, final_positions, node_layout_k)
 
-    return final_pos, folder_rect_data
+    return final_positions, folder_rect_data
 
 
-def _build_bokeh_layout(graph: nx.DiGraph, layout: str) -> tuple[dict, dict]:
+def _build_bokeh_layout(
+    graph: nx.DiGraph,
+    layout: str,
+) -> tuple[dict[str, tuple[float, float]], FolderRectData]:
     if layout != "constrained":
-        raise ValueError(
-            "Unsupported Bokeh layout "
-            f"'{layout}'. Supported layouts: constrained."
-        )
+        raise ValueError(f"Unsupported Bokeh layout '{layout}'. Supported layouts: constrained.")
 
-    return create_constrained_layout(graph)
+    return _create_constrained_layout(graph)
 
 
 def _populate_node_visual_data(graph: nx.DiGraph) -> None:
-    node_ids_list = list(graph.nodes())
     degrees = dict(graph.degree())
 
-    for node_id in node_ids_list:
-        node_original_data = graph.nodes[node_id]
+    for node_id in list(graph.nodes()):
+        node_data = graph.nodes[node_id]
         current_degree = degrees.get(node_id, 0)
-        calculated_size = MIN_NODE_SIZE_CONSTANT + current_degree * 10
-        calculated_radius_screen = calculated_size / 2.0
+        calculated_size = MIN_NODE_SIZE + current_degree * 10
 
-        graph.nodes[node_id]["viz_size"] = calculated_size
-        graph.nodes[node_id]["viz_radius_screen"] = calculated_radius_screen
-        graph.nodes[node_id]["viz_color"] = COLOR_MAP.get(
-            node_original_data.get("type", "unresolved"),
+        node_data["viz_size"] = calculated_size
+        node_data["viz_color"] = COLOR_MAP.get(
+            str(node_data.get("type", "unresolved")),
             DEFAULT_NODE_COLOR,
         )
-        graph.nodes[node_id]["viz_label"] = node_original_data.get("label", str(node_id))
-        graph.nodes[node_id]["viz_degree"] = current_degree
-        graph.nodes[node_id]["viz_type"] = node_original_data.get("type", "unresolved")
-        graph.nodes[node_id]["in_degree"] = node_original_data.get("in_degree", 0)
-        graph.nodes[node_id]["out_degree"] = node_original_data.get("out_degree", 0)
-        graph.nodes[node_id]["total_degree"] = node_original_data.get("total_degree", 0)
-        graph.nodes[node_id]["viz_label_y_offset"] = calculated_radius_screen + LABEL_PADDING
+        node_data["viz_label"] = str(node_data.get("label", node_id))
+        node_data["viz_degree"] = current_degree
+        node_data["viz_type"] = str(node_data.get("type", "unresolved"))
+        node_data["viz_label_y_offset"] = int(calculated_size / 2.0 + LABEL_PADDING)
+        node_data["in_degree"] = _to_int(node_data.get("in_degree", 0))
+        node_data["out_degree"] = _to_int(node_data.get("out_degree", 0))
+        node_data["total_degree"] = _to_int(node_data.get("total_degree", 0))
 
 
-def _create_bokeh_plot(folder_rect_data: dict) -> tuple:
-    plot = figure(
-        title="Interactive graph with draggable nodes",
-        sizing_mode="scale_both",
-        tools="pan,wheel_zoom,box_zoom,reset,save,tap,hover,point_draw",
-        active_drag="pan",
-        active_inspect="hover",
-        output_backend="webgl",
+def _to_int(value: object) -> int:
+    if isinstance(value, bool):
+        return int(value)
+    if isinstance(value, int):
+        return value
+    return 0
+
+
+def _create_bokeh_plot(folder_rect_data: FolderRectData) -> tuple[figure_model, ColumnDataSource]:
+    plot = figure_model(title="Interactive dependency graph")
+    plot.sizing_mode = "scale_both"
+    plot.output_backend = "webgl"
+
+    pan_tool = PanTool()
+    hover_tool = HoverTool()
+    plot.add_tools(
+        pan_tool,
+        WheelZoomTool(),
+        BoxZoomTool(),
+        ResetTool(),
+        SaveTool(),
+        TapTool(),
+        hover_tool,
     )
+    plot.toolbar.active_drag = pan_tool
+    plot.toolbar.active_inspect = hover_tool
 
     folder_source = ColumnDataSource(data=folder_rect_data)
-
     plot.rect(
         x="x",
         y="y",
@@ -235,7 +334,6 @@ def _create_bokeh_plot(folder_rect_data: dict) -> tuple:
         text_font_size="12pt",
         text_color="black",
         text_align="center",
-        text_baseline="bottom",
         y_offset=0,
         level="overlay",
     )
@@ -244,83 +342,80 @@ def _create_bokeh_plot(folder_rect_data: dict) -> tuple:
     return plot, folder_source
 
 
-def _sync_node_coordinates(graph_renderer: Any, final_pos: dict) -> None:
-    node_data_source = graph_renderer.node_renderer.data_source
-    if not node_data_source or not node_data_source.data:
+def _sync_node_coordinates(
+    graph_renderer: GraphRenderer,
+    final_positions: Mapping[str, tuple[float, float]],
+) -> None:
+    data_source = cast("ColumnDataSource", graph_renderer.node_renderer.data_source)
+    node_data = data_source.data
+    indices = node_data.get("index")
+    if not isinstance(indices, list) or not indices:
+        return
+    if isinstance(node_data.get("x"), list) and isinstance(node_data.get("y"), list):
         return
 
-    node_data = node_data_source.data
-    if ("x" in node_data and "y" in node_data and node_data.get("x") and node_data.get("y")) or not node_data.get(
-        "index"
-    ):
-        return
-
-    ordered_node_ids_from_source = node_data["index"]
+    ordered_node_ids = [str(node_id) for node_id in indices]
     try:
-        node_xs = [final_pos[node_id][0] for node_id in ordered_node_ids_from_source]
-        node_ys = [final_pos[node_id][1] for node_id in ordered_node_ids_from_source]
+        node_xs = [final_positions[node_id][0] for node_id in ordered_node_ids]
+        node_ys = [final_positions[node_id][1] for node_id in ordered_node_ids]
     except KeyError:
         return
 
-    node_data_source.data["x"] = node_xs
-    node_data_source.data["y"] = node_ys
+    node_data["x"] = node_xs
+    node_data["y"] = node_ys
 
 
-def _configure_selection_glyph(node_renderer: Any) -> None:
-    if node_renderer.selection_glyph is None or not hasattr(node_renderer.selection_glyph, "size"):
-        node_renderer.selection_glyph = Circle(
-            radius="viz_radius_screen",
-            radius_units="screen",
-            fill_color="firebrick",
-            fill_alpha=0.8,
-            line_color="black",
-            line_width=2,
-        )
-        return
-
-    sel_glyph = node_renderer.selection_glyph
-    if hasattr(sel_glyph, "size"):
-        sel_glyph.size = "viz_size"
-    elif hasattr(sel_glyph, "radius"):
-        sel_glyph.radius = "viz_radius_screen"
-        if hasattr(sel_glyph, "radius_units"):
-            sel_glyph.radius_units = "screen"
-
-    sel_glyph.fill_color = "firebrick"
-    sel_glyph.line_width = 2
-
-
-def _configure_node_renderer(graph_renderer: Any) -> None:
-    main_node_glyph = graph_renderer.node_renderer.glyph
-    main_node_glyph.size = "viz_size"
-    main_node_glyph.fill_color = "viz_color"
-    main_node_glyph.fill_alpha = 0.8
-    main_node_glyph.line_color = "black"
-    main_node_glyph.line_width = 0.5
-
-    graph_renderer.node_renderer.hover_glyph = Circle(
-        radius="viz_radius_screen",
-        radius_units="screen",
+def _configure_node_renderer(graph_renderer: GraphRenderer) -> None:
+    graph_renderer.node_renderer.glyph = Scatter(
+        marker="circle",
+        size="viz_size",
+        fill_color="viz_color",
+        fill_alpha=0.8,
+        line_color="black",
+        line_width=0.5,
+    )
+    graph_renderer.node_renderer.hover_glyph = Scatter(
+        marker="circle",
+        size="viz_size",
         fill_color="orange",
         fill_alpha=0.8,
         line_color="black",
         line_width=2,
     )
-    _configure_selection_glyph(graph_renderer.node_renderer)
+    graph_renderer.node_renderer.selection_glyph = Scatter(
+        marker="circle",
+        size="viz_size",
+        fill_color="firebrick",
+        fill_alpha=0.8,
+        line_color="black",
+        line_width=2,
+    )
 
 
-def _configure_edge_renderer(graph_renderer: Any) -> None:
-    graph_renderer.edge_renderer.glyph = MultiLine(line_color="#CCCCCC", line_alpha=0.8, line_width=1.5)
+def _configure_edge_renderer(graph_renderer: GraphRenderer) -> None:
+    graph_renderer.edge_renderer.glyph = MultiLine(
+        line_color="#CCCCCC",
+        line_alpha=0.8,
+        line_width=1.5,
+    )
     graph_renderer.edge_renderer.hover_glyph = MultiLine(line_color="orange", line_width=2)
     graph_renderer.edge_renderer.selection_glyph = MultiLine(line_color="firebrick", line_width=2)
 
 
-def _build_arrow_source_data(graph: nx.DiGraph, final_pos: dict) -> dict[str, list[float]]:
-    arrow_source_data: dict[str, list[float]] = {"start_x": [], "start_y": [], "end_x": [], "end_y": []}
+def _build_arrow_source_data(
+    graph: nx.DiGraph,
+    final_positions: Mapping[str, tuple[float, float]],
+) -> ArrowSourceData:
+    arrow_source_data: ArrowSourceData = {
+        "start_x": [],
+        "start_y": [],
+        "end_x": [],
+        "end_y": [],
+    }
 
     for start_node, end_node in graph.edges():
-        start_coords = final_pos[start_node]
-        end_coords = final_pos[end_node]
+        start_coords = final_positions[str(start_node)]
+        end_coords = final_positions[str(end_node)]
         arrow_source_data["start_x"].append(start_coords[0])
         arrow_source_data["start_y"].append(start_coords[1])
         arrow_source_data["end_x"].append(end_coords[0])
@@ -329,11 +424,14 @@ def _build_arrow_source_data(graph: nx.DiGraph, final_pos: dict) -> dict[str, li
     return arrow_source_data
 
 
-def _add_arrow_renderer(plot: Any, graph: nx.DiGraph, final_pos: dict) -> None:
-    arrow_source = ColumnDataSource(data=_build_arrow_source_data(graph, final_pos))
-    arrow_head = OpenHead(line_color="gray", line_width=2, size=12)
+def _add_arrow_renderer(
+    plot: figure_model,
+    graph: nx.DiGraph,
+    final_positions: Mapping[str, tuple[float, float]],
+) -> None:
+    arrow_source = ColumnDataSource(data=_build_arrow_source_data(graph, final_positions))
     arrow_renderer = Arrow(
-        end=arrow_head,
+        end=OpenHead(line_color="gray", line_width=2, size=12),
         source=arrow_source,
         x_start="start_x",
         y_start="start_y",
@@ -343,13 +441,13 @@ def _add_arrow_renderer(plot: Any, graph: nx.DiGraph, final_pos: dict) -> None:
     plot.add_layout(arrow_renderer)
 
 
-def _configure_hover(plot: Any, graph_renderer: Any) -> None:
-    hover_tool_instance = plot.select_one(HoverTool)
-    if not hover_tool_instance:
+def _configure_hover(plot: figure_model, graph_renderer: GraphRenderer) -> None:
+    hover_tool = cast("HoverTool | None", plot.select_one({"type": HoverTool}))
+    if hover_tool is None:
         return
 
-    hover_tool_instance.renderers = [graph_renderer.node_renderer]
-    hover_tool_instance.tooltips = [
+    hover_tool.renderers = [graph_renderer.node_renderer]
+    hover_tool.tooltips = [
         ("Name", "@viz_label"),
         ("Type", "@viz_type"),
         ("Total Links", "@total_degree"),
@@ -360,19 +458,30 @@ def _configure_hover(plot: Any, graph_renderer: Any) -> None:
     ]
 
 
+def _enable_node_dragging(plot: figure_model, graph_renderer: GraphRenderer) -> None:
+    point_draw_tool = PointDrawTool(renderers=[graph_renderer.node_renderer])
+    plot.add_tools(point_draw_tool)
+    plot.toolbar.active_drag = point_draw_tool
+
+
 def draw_bokeh_graph(graph: nx.DiGraph, layout: str) -> None:
+    """Render a dependency graph with Bokeh."""
     _populate_node_visual_data(graph)
 
-    final_pos, folder_rect_data = _build_bokeh_layout(graph, layout)
+    final_positions, folder_rect_data = _build_bokeh_layout(graph, layout)
     plot, _folder_source = _create_bokeh_plot(folder_rect_data)
-    graph_renderer = from_networkx(graph, final_pos)
-    _sync_node_coordinates(graph_renderer, final_pos)
+    graph_renderer = from_networkx(
+        graph,
+        cast("dict[int | str, Sequence[float]]", final_positions),
+    )
+    _sync_node_coordinates(graph_renderer, final_positions)
     _configure_node_renderer(graph_renderer)
     _configure_edge_renderer(graph_renderer)
-    _add_arrow_renderer(plot, graph, final_pos)
+    _add_arrow_renderer(plot, graph, final_positions)
     graph_renderer.selection_policy = NodesAndLinkedEdges()
     graph_renderer.inspection_policy = NodesAndLinkedEdges()
     _configure_hover(plot, graph_renderer)
+    _enable_node_dragging(plot, graph_renderer)
     plot.renderers.append(graph_renderer)
 
     show(plot)

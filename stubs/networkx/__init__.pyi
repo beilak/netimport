@@ -1,0 +1,104 @@
+from collections.abc import Iterable, Iterator, Mapping, Sequence
+from typing import Literal, overload
+
+class DegreeView:
+    def __iter__(self) -> Iterator[tuple[object, int]]: ...
+
+
+class NodeView:
+    def __iter__(self) -> Iterator[object]: ...
+    def __len__(self) -> int: ...
+
+    @overload
+    def __call__(self, data: Literal[False] = ...) -> Iterable[object]: ...
+
+    @overload
+    def __call__(self, data: Literal[True]) -> Iterable[tuple[object, dict[str, object]]]: ...
+
+    def __getitem__(self, node: object) -> dict[str, object]: ...
+
+
+class EdgeView:
+    def __iter__(self) -> Iterator[tuple[object, object]]: ...
+    def __call__(self) -> Iterable[tuple[object, object]]: ...
+
+
+class Graph:
+    nodes: NodeView
+    edges: EdgeView
+
+    def __contains__(self, node: object) -> bool: ...
+    def add_node(self, node_for_adding: object, **attr: object) -> None: ...
+    def add_edge(self, u_of_edge: object, v_of_edge: object, **attr: object) -> None: ...
+    def has_edge(self, u: object, v: object) -> bool: ...
+    def subgraph(self, nodes: Iterable[object]) -> Graph: ...
+
+    @overload
+    def degree(self, nbunch: None = ...) -> DegreeView: ...
+
+    @overload
+    def degree(self, nbunch: object) -> int: ...
+
+    def number_of_nodes(self) -> int: ...
+    def number_of_edges(self) -> int: ...
+    def remove_nodes_from(self, nodes: Iterable[object]) -> None: ...
+
+
+class DiGraph(Graph):
+    def subgraph(self, nodes: Iterable[object]) -> DiGraph: ...
+
+    @overload
+    def in_degree(self, nbunch: None = ...) -> DegreeView: ...
+
+    @overload
+    def in_degree(self, nbunch: object) -> int: ...
+
+    @overload
+    def out_degree(self, nbunch: None = ...) -> DegreeView: ...
+
+    @overload
+    def out_degree(self, nbunch: object) -> int: ...
+
+
+def spring_layout(
+    graph: Graph | DiGraph,
+    *,
+    k: float | None = ...,
+    iterations: int = ...,
+    seed: int | None = ...,
+    scale: float = ...,
+    center: tuple[float, float] | None = ...,
+) -> dict[object, Sequence[float]]: ...
+def circular_layout(graph: Graph | DiGraph) -> dict[object, Sequence[float]]: ...
+def shell_layout(graph: Graph | DiGraph) -> dict[object, Sequence[float]]: ...
+def planar_layout(graph: Graph | DiGraph) -> dict[object, Sequence[float]]: ...
+def isolates(graph: DiGraph) -> Iterator[object]: ...
+def draw_networkx_nodes(
+    graph: DiGraph,
+    pos: Mapping[object, Sequence[float]],
+    *,
+    node_color: Sequence[str],
+    node_size: Sequence[int],
+    alpha: float,
+) -> object: ...
+def draw_networkx_labels(
+    graph: DiGraph,
+    pos: Mapping[object, Sequence[float]],
+    *,
+    labels: Mapping[object, str],
+    font_size: int,
+    font_weight: str,
+) -> object: ...
+def draw_networkx_edges(
+    graph: DiGraph,
+    pos: Mapping[object, Sequence[float]],
+    *,
+    arrows: bool,
+    arrowstyle: str,
+    style: str,
+    arrowsize: int,
+    edge_color: str,
+    width: int,
+    node_size: Sequence[int],
+    connectionstyle: str,
+) -> object: ...

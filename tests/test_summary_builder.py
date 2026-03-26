@@ -1,6 +1,7 @@
 from pathlib import Path
 
 import networkx as nx
+from _pytest.capture import CaptureFixture
 
 from netimport_lib.summary_builder import format_summary, print_summary
 
@@ -95,7 +96,7 @@ def test_format_summary_includes_numeric_coupling_metrics() -> None:
     ]
 
 
-def test_print_summary_writes_formatted_lines(capsys) -> None:
+def test_print_summary_writes_formatted_lines(capsys: CaptureFixture[str]) -> None:
     graph = _build_demo_graph()
 
     print_summary(graph)

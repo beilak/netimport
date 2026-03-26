@@ -1,11 +1,14 @@
+"""Plotly-based graph rendering helpers."""
+
 import networkx as nx
 import plotly.graph_objects as go
 
 
-FREEZ_RANDOM_SEED = 42
+FREEZE_RANDOM_SEED = 42
 
 
 def draw_plotly_graph(graph: nx.DiGraph, _layout: str) -> None:
+    """Render a dependency graph with Plotly."""
     pos = nx.spring_layout(graph, k=0.5, iterations=50)
 
     edge_x = []

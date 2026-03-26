@@ -1,15 +1,28 @@
 from pathlib import Path
+from typing import Final
 
+import networkx as nx
+from _pytest.monkeypatch import MonkeyPatch
 from click.testing import CliRunner
 
-import netimport_lib.cli as cli
+from netimport_lib import cli
+from netimport_lib.config_loader import NetImportConfigMap
 from netimport_lib.visualizer import GraphVisualizer
+
+
+def _default_loaded_config(_project_root: str) -> NetImportConfigMap:
+    return {
+        "ignored_nodes": set(),
+        "ignored_dirs": set(),
+        "ignored_files": set(),
+        "ignore_stdlib": False,
+        "ignore_external_lib": False,
+    }
 
 
 def _write_pyproject_config(project_root: Path, config_body: str) -> None:
     (project_root / "pyproject.toml").write_text(
-        "[project]\nname = 'sample-project'\nversion = '0.1.0'\n"
-        f"{config_body}",
+        f"[project]\nname = 'sample-project'\nversion = '0.1.0'\n{config_body}",
         encoding="utf-8",
     )
 
@@ -20,7 +33,7 @@ def _build_recording_visualizer(
     default_layout: str,
     calls: list[tuple[str, str]],
 ) -> GraphVisualizer:
-    def fake_visualizer(_graph, layout: str) -> None:
+    def fake_visualizer(_graph: nx.DiGraph, layout: str) -> None:
         calls.append((name, layout))
 
     return GraphVisualizer(
@@ -31,7 +44,7 @@ def _build_recording_visualizer(
     )
 
 
-def test_cli_prints_console_summary(monkeypatch, tmp_path: Path) -> None:
+def test_cli_prints_console_summary(monkeypatch: MonkeyPatch, tmp_path: Path) -> None:
     project_root = tmp_path / "sample_project"
     project_root.mkdir()
 
@@ -45,19 +58,9 @@ def test_cli_prints_console_summary(monkeypatch, tmp_path: Path) -> None:
     )
 
     monkeypatch.setattr(cli, "GRAPH_VISUALIZERS", {})
-    monkeypatch.setattr(
-        cli,
-        "load_config",
-        lambda _project_root: {
-            "ignored_nodes": set(),
-            "ignored_dirs": set(),
-            "ignored_files": set(),
-            "ignore_stdlib": False,
-            "ignore_external_lib": False,
-        },
-    )
+    monkeypatch.setattr(cli, "load_config", _default_loaded_config)
 
-    runner = CliRunner()
+    runner: Final[CliRunner] = CliRunner()
     result = runner.invoke(
         cli.main,
         [str(project_root), "--show-console-summary", "--no-show-graph"],
@@ -73,18 +76,12 @@ def test_cli_prints_console_summary(monkeypatch, tmp_path: Path) -> None:
     assert "| 1    | .missing.item | unresolved_relative |" in result.output
 
 
-def test_cli_no_show_graph_disables_visualizer(monkeypatch, tmp_path: Path) -> None:
+def test_cli_no_show_graph_disables_visualizer(monkeypatch: MonkeyPatch, tmp_path: Path) -> None:
     project_root = tmp_path / "sample_project"
     project_root.mkdir()
 
-    (project_root / "main.py").write_text(
-        "import helper\n",
-        encoding="utf-8",
-    )
-    (project_root / "helper.py").write_text(
-        "",
-        encoding="utf-8",
-    )
+    (project_root / "main.py").write_text("import helper\n", encoding="utf-8")
+    (project_root / "helper.py").write_text("", encoding="utf-8")
 
     visualizer_calls: list[tuple[str, str]] = []
     monkeypatch.setattr(
@@ -99,19 +96,9 @@ def test_cli_no_show_graph_disables_visualizer(monkeypatch, tmp_path: Path) -> N
             )
         },
     )
-    monkeypatch.setattr(
-        cli,
-        "load_config",
-        lambda _project_root: {
-            "ignored_nodes": set(),
-            "ignored_dirs": set(),
-            "ignored_files": set(),
-            "ignore_stdlib": False,
-            "ignore_external_lib": False,
-        },
-    )
+    monkeypatch.setattr(cli, "load_config", _default_loaded_config)
 
-    runner = CliRunner()
+    runner: Final[CliRunner] = CliRunner()
     result = runner.invoke(
         cli.main,
         [str(project_root), "--show-console-summary", "--no-show-graph"],
@@ -122,14 +109,14 @@ def test_cli_no_show_graph_disables_visualizer(monkeypatch, tmp_path: Path) -> N
     assert visualizer_calls == []
 
 
-def test_cli_uses_bokeh_default_layout_when_layout_is_omitted(monkeypatch, tmp_path: Path) -> None:
+def test_cli_uses_bokeh_default_layout_when_layout_is_omitted(
+    monkeypatch: MonkeyPatch,
+    tmp_path: Path,
+) -> None:
     project_root = tmp_path / "sample_project"
     project_root.mkdir()
 
-    (project_root / "main.py").write_text(
-        "import helper\n",
-        encoding="utf-8",
-    )
+    (project_root / "main.py").write_text("import helper\n", encoding="utf-8")
     (project_root / "helper.py").write_text("", encoding="utf-8")
 
     visualizer_calls: list[tuple[str, str]] = []
@@ -151,26 +138,19 @@ def test_cli_uses_bokeh_default_layout_when_layout_is_omitted(monkeypatch, tmp_p
             ),
         },
     )
-    monkeypatch.setattr(
-        cli,
-        "load_config",
-        lambda _project_root: {
-            "ignored_nodes": set(),
-            "ignored_dirs": set(),
-            "ignored_files": set(),
-            "ignore_stdlib": False,
-            "ignore_external_lib": False,
-        },
-    )
+    monkeypatch.setattr(cli, "load_config", _default_loaded_config)
 
-    runner = CliRunner()
+    runner: Final[CliRunner] = CliRunner()
     result = runner.invoke(cli.main, [str(project_root)])
 
     assert result.exit_code == 0
     assert visualizer_calls == [("bokeh", "constrained")]
 
 
-def test_cli_uses_mpl_default_layout_when_layout_is_omitted(monkeypatch, tmp_path: Path) -> None:
+def test_cli_uses_mpl_default_layout_when_layout_is_omitted(
+    monkeypatch: MonkeyPatch,
+    tmp_path: Path,
+) -> None:
     project_root = tmp_path / "sample_project"
     project_root.mkdir()
 
@@ -196,26 +176,19 @@ def test_cli_uses_mpl_default_layout_when_layout_is_omitted(monkeypatch, tmp_pat
             ),
         },
     )
-    monkeypatch.setattr(
-        cli,
-        "load_config",
-        lambda _project_root: {
-            "ignored_nodes": set(),
-            "ignored_dirs": set(),
-            "ignored_files": set(),
-            "ignore_stdlib": False,
-            "ignore_external_lib": False,
-        },
-    )
+    monkeypatch.setattr(cli, "load_config", _default_loaded_config)
 
-    runner = CliRunner()
+    runner: Final[CliRunner] = CliRunner()
     result = runner.invoke(cli.main, [str(project_root), "--show-graph", "mpl"])
 
     assert result.exit_code == 0
     assert visualizer_calls == [("mpl", "spring")]
 
 
-def test_cli_accepts_supported_backend_and_layout_combination(monkeypatch, tmp_path: Path) -> None:
+def test_cli_accepts_supported_backend_and_layout_combination(
+    monkeypatch: MonkeyPatch,
+    tmp_path: Path,
+) -> None:
     project_root = tmp_path / "sample_project"
     project_root.mkdir()
 
@@ -241,19 +214,9 @@ def test_cli_accepts_supported_backend_and_layout_combination(monkeypatch, tmp_p
             ),
         },
     )
-    monkeypatch.setattr(
-        cli,
-        "load_config",
-        lambda _project_root: {
-            "ignored_nodes": set(),
-            "ignored_dirs": set(),
-            "ignored_files": set(),
-            "ignore_stdlib": False,
-            "ignore_external_lib": False,
-        },
-    )
+    monkeypatch.setattr(cli, "load_config", _default_loaded_config)
 
-    runner = CliRunner()
+    runner: Final[CliRunner] = CliRunner()
     result = runner.invoke(
         cli.main,
         [str(project_root), "--show-graph", "mpl", "--layout", "circular"],
@@ -267,7 +230,7 @@ def test_cli_rejects_unsupported_backend_and_layout_combination(tmp_path: Path) 
     project_root = tmp_path / "sample_project"
     project_root.mkdir()
 
-    runner = CliRunner()
+    runner: Final[CliRunner] = CliRunner()
     result = runner.invoke(
         cli.main,
         [str(project_root), "--show-graph", "bokeh", "--layout", "spring"],
@@ -279,7 +242,7 @@ def test_cli_rejects_unsupported_backend_and_layout_combination(tmp_path: Path) 
 
 
 def test_cli_help_lists_only_supported_visualizers_and_layouts() -> None:
-    runner = CliRunner()
+    runner: Final[CliRunner] = CliRunner()
     result = runner.invoke(cli.main, ["--help"])
 
     assert result.exit_code == 0
@@ -294,7 +257,7 @@ def test_cli_help_lists_only_supported_visualizers_and_layouts() -> None:
     assert "plotly" not in result.output
 
 
-def test_cli_loads_config_from_target_project(monkeypatch, tmp_path: Path) -> None:
+def test_cli_loads_config_from_target_project(monkeypatch: MonkeyPatch, tmp_path: Path) -> None:
     caller_root = tmp_path / "caller"
     caller_root.mkdir()
     _write_pyproject_config(caller_root, "\n[tool.netimport]\nignored_dirs = []\n")
@@ -311,7 +274,7 @@ def test_cli_loads_config_from_target_project(monkeypatch, tmp_path: Path) -> No
     monkeypatch.chdir(caller_root)
     monkeypatch.setattr(cli, "GRAPH_VISUALIZERS", {})
 
-    runner = CliRunner()
+    runner: Final[CliRunner] = CliRunner()
     result = runner.invoke(
         cli.main,
         [str(project_root), "--show-console-summary", "--no-show-graph"],
@@ -321,7 +284,7 @@ def test_cli_loads_config_from_target_project(monkeypatch, tmp_path: Path) -> No
     assert "| Project files            | 1     |" in result.output
 
 
-def test_cli_merges_file_and_cli_config(monkeypatch, tmp_path: Path) -> None:
+def test_cli_merges_file_and_cli_config(monkeypatch: MonkeyPatch, tmp_path: Path) -> None:
     project_root = tmp_path / "target_project"
     project_root.mkdir()
     _write_pyproject_config(
@@ -342,7 +305,7 @@ def test_cli_merges_file_and_cli_config(monkeypatch, tmp_path: Path) -> None:
 
     monkeypatch.setattr(cli, "GRAPH_VISUALIZERS", {})
 
-    runner = CliRunner()
+    runner: Final[CliRunner] = CliRunner()
     result = runner.invoke(
         cli.main,
         [
@@ -360,7 +323,7 @@ def test_cli_merges_file_and_cli_config(monkeypatch, tmp_path: Path) -> None:
     assert "| Standard library modules | 1     |" in result.output
 
 
-def test_cli_applies_ignored_files_from_config(monkeypatch, tmp_path: Path) -> None:
+def test_cli_applies_ignored_files_from_config(monkeypatch: MonkeyPatch, tmp_path: Path) -> None:
     project_root = tmp_path / "target_project"
     project_root.mkdir()
     _write_pyproject_config(project_root, "\n[tool.netimport]\nignored_files = ['skip.py']\n")
@@ -370,7 +333,7 @@ def test_cli_applies_ignored_files_from_config(monkeypatch, tmp_path: Path) -> N
 
     monkeypatch.setattr(cli, "GRAPH_VISUALIZERS", {})
 
-    runner = CliRunner()
+    runner: Final[CliRunner] = CliRunner()
     result = runner.invoke(
         cli.main,
         [str(project_root), "--show-console-summary", "--no-show-graph"],
@@ -380,7 +343,10 @@ def test_cli_applies_ignored_files_from_config(monkeypatch, tmp_path: Path) -> N
     assert "| Project files            | 1     |" in result.output
 
 
-def test_cli_works_without_tool_netimport_config(monkeypatch, tmp_path: Path) -> None:
+def test_cli_works_without_tool_netimport_config(
+    monkeypatch: MonkeyPatch,
+    tmp_path: Path,
+) -> None:
     project_root = tmp_path / "target_project"
     project_root.mkdir()
     (project_root / "pyproject.toml").write_text(
@@ -391,7 +357,7 @@ def test_cli_works_without_tool_netimport_config(monkeypatch, tmp_path: Path) ->
 
     monkeypatch.setattr(cli, "GRAPH_VISUALIZERS", {})
 
-    runner = CliRunner()
+    runner: Final[CliRunner] = CliRunner()
     result = runner.invoke(
         cli.main,
         [str(project_root), "--show-console-summary", "--no-show-graph"],

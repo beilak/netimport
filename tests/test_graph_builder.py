@@ -9,6 +9,10 @@ from netimport_lib.graph_builder.graph_builder import (
 )
 
 
+def _relative_path(node_id: object, project_root: Path) -> str:
+    return os.path.relpath(str(node_id), project_root)
+
+
 def test_build_dependency_graph(tmp_path: Path) -> None:
     project_root = tmp_path / "project"
     project_root.mkdir()
@@ -53,7 +57,7 @@ from utils import helper
         "component.py",
         "utils/helper.py",
     }
-    actual_nodes = {os.path.relpath(n, project_root) for n in graph.nodes()}
+    actual_nodes = {_relative_path(node_id, project_root) for node_id in graph.nodes()}
     assert actual_nodes == expected_nodes
 
     expected_edges = {
@@ -61,7 +65,10 @@ from utils import helper
         ("main.py", "utils/helper.py"),
         ("component.py", "utils/helper.py"),
     }
-    actual_edges = {(os.path.relpath(u, project_root), os.path.relpath(v, project_root)) for u, v in graph.edges()}
+    actual_edges = {
+        (_relative_path(source_node, project_root), _relative_path(target_node, project_root))
+        for source_node, target_node in graph.edges()
+    }
     assert actual_edges == expected_edges
 
 
@@ -86,7 +93,10 @@ def test_build_dependency_graph_normalizes_source_file_ids(tmp_path: Path) -> No
         ignore=ignore_config,
     )
 
-    actual_edges = {(os.path.relpath(u, project_root), os.path.relpath(v, project_root)) for u, v in graph.edges()}
+    actual_edges = {
+        (_relative_path(source_node, project_root), _relative_path(target_node, project_root))
+        for source_node, target_node in graph.edges()
+    }
     assert actual_edges == {("main.py", "helper.py")}
 
 
@@ -112,11 +122,16 @@ def test_build_dependency_graph_resolves_relative_package_imports(tmp_path: Path
         ignore=ignore_config,
     )
 
-    actual_edges = {(os.path.relpath(u, project_root), os.path.relpath(v, project_root)) for u, v in graph.edges()}
+    actual_edges = {
+        (_relative_path(source_node, project_root), _relative_path(target_node, project_root))
+        for source_node, target_node in graph.edges()
+    }
     assert actual_edges == {("pkg/module.py", "pkg/__init__.py")}
 
 
-def test_build_dependency_graph_adds_unresolved_relative_too_many_dots_nodes(tmp_path: Path) -> None:
+def test_build_dependency_graph_adds_unresolved_relative_too_many_dots_nodes(
+    tmp_path: Path,
+) -> None:
     project_root = tmp_path / "project"
     package_dir = project_root / "pkg"
     package_dir.mkdir(parents=True)

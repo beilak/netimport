@@ -24,10 +24,10 @@ jobs:
         run: poetry install
 
       - name: Lint with ruff
-        run: poetry run ruff check .
+        run: poetry run ruff check netimport_lib tests
 
       - name: Type check with mypy
-        run: poetry run mypy .
+        run: poetry run mypy netimport_lib tests
 
       - name: Test with pytest
-        run: poetry run pytest
+        run: poetry run pytest tests

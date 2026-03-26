@@ -126,20 +126,7 @@ class ImportVisitor(ast.NodeVisitor):
         self.generic_visit(node)
 
     def visit_If(self, node: ast.If) -> None:
-        is_type_checking_if = False
-        # for if TYPE_CHECKING:
-        if isinstance(node.test, ast.Name) and node.test.id == "TYPE_CHECKING":
-            is_type_checking_if = True
-
-        elif isinstance(node.test, ast.Attribute):
-            current = node.test
-            while isinstance(current, ast.Attribute):
-                if current.attr == "TYPE_CHECKING":
-                    is_type_checking_if = True
-                    break
-                current = current.value
-            if isinstance(current, ast.Name) and current.id == "TYPE_CHECKING":
-                is_type_checking_if = True
+        is_type_checking_if = _is_type_checking_test(node.test)
 
         original_in_type_checking_block = self._in_type_checking_block
         if is_type_checking_if:
@@ -153,6 +140,14 @@ class ImportVisitor(ast.NodeVisitor):
 
         for stmt in node.orelse:
             self.visit(stmt)
+
+
+def _is_type_checking_test(node: ast.expr) -> bool:
+    if isinstance(node, ast.Name):
+        return node.id == "TYPE_CHECKING"
+    if isinstance(node, ast.Attribute):
+        return node.attr == "TYPE_CHECKING"
+    return False
 
 
 def get_imported_modules_as_strings(file_path: str, include_type_checking_imports: bool = False) -> list[str]:

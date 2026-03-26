@@ -222,6 +222,14 @@ The repository has CI for `ruff`, `mypy`, and `pytest`. A production-ready tool 
 
 ## P2. Test suite is too shallow
 
+### Status
+
+Partially improved. Core CLI/config/summary coverage exists, and resolver edge-case coverage has been added in:
+
+- `tests/test_resolver_imports.py`
+- `tests/test_graph_builder.py`
+- `tests/test_imports_reader.py`
+
 ### Why it matters
 
 Current green tests do not prove product correctness.
@@ -233,9 +241,9 @@ Current green tests do not prove product correctness.
 
 ### Evidence
 
-Current tests mostly cover happy-path parsing and graph creation.
+Current tests no longer only cover happy-path parsing and graph creation.
 
-Missing tests include:
+Coverage added since the original audit:
 
 - CLI behavior
 - config precedence
@@ -245,6 +253,10 @@ Missing tests include:
 - unresolved imports
 - stdlib vs external import classification
 - relative import edge cases
+- type-checking import filtering
+
+Remaining gaps include:
+
 - visualizer behavior
 - headless environments
 
@@ -262,10 +274,10 @@ Also, demo tests are weak:
 
 Add tests in layers:
 
-1. Unit tests for config loading.
-2. Unit tests for import resolution edge cases.
-3. Snapshot-like tests for summary output.
-4. CLI integration tests using `click.testing.CliRunner`.
+1. DONE. Unit tests for config loading.
+2. DONE. Unit tests for import resolution edge cases.
+3. DONE. Snapshot-like tests for summary output.
+4. DONE. CLI integration tests using `click.testing.CliRunner`.
 5. Optional smoke tests for visualizer adapters.
 
 ### Acceptance criteria
@@ -368,6 +380,13 @@ Only do this if module execution is intended to be supported.
 
 ## P2. Complex functions need decomposition
 
+### Status
+
+Partially improved. `netimport_lib/graph_builder/graph_builder.py` and
+`netimport_lib/graph_builder/resolver_imports.py` have been decomposed into
+smaller helpers and now pass targeted Ruff complexity checks. The Bokeh
+visualizer still needs the same treatment.
+
 ### Why it matters
 
 The graph builder, resolver, and Bokeh visualizer have high complexity and are getting hard to maintain.
@@ -387,8 +406,8 @@ The graph builder, resolver, and Bokeh visualizer have high complexity and are g
 
 Refactor into smaller units, for example:
 
-- resolver: split relative import resolution, absolute import resolution, stdlib/external classification
-- graph builder: split node initialization, edge insertion, node metadata enrichment
+- DONE. resolver: split relative import resolution, absolute import resolution, stdlib/external classification
+- DONE. graph builder: split node initialization, edge insertion, node metadata enrichment
 - Bokeh plotter: split layout generation, node styling, edge styling, hover config
 
 ### Acceptance criteria
@@ -512,23 +531,47 @@ This section is the implementation backlog for another LLM or engineer.
 - Avoid output that depends on dict insertion order.
 - JSON output may be more useful than text for automation.
 
-## Workstream 3. Stabilize import resolution
+## DONE. Workstream 3. Stabilize import resolution
 
-### Tasks
+### Status
 
-1. Add tests for absolute imports, relative imports, package imports, star imports, unresolved imports, and type-checking imports.
-2. Revisit the resolver behavior for:
+Implemented in:
+
+- `netimport_lib/imports_reader.py`
+- `netimport_lib/graph_builder/resolver_imports.py`
+- `netimport_lib/graph_builder/graph_builder.py`
+- `tests/test_resolver_imports.py`
+- `tests/test_graph_builder.py`
+- `tests/test_imports_reader.py`
+
+### Done
+
+1. Added tests for absolute imports, relative imports, package imports, star imports, unresolved imports, and type-checking imports.
+2. Reworked resolver behavior for:
    - `from . import *`
    - `from .. import x`
    - unresolved relative imports
    - package `__init__.py`
-3. Clean up return types and mypy issues.
-4. Decide how much namespace package support is expected.
+3. Cleaned up return types and mypy issues in the import-resolution path.
+4. Normalized source file ids in graph building and added integration coverage for that contract.
+5. Decided that namespace packages are not explicitly supported in the current resolver contract; unsupported cases should remain explicit rather than guessed.
+
+### Tasks
+
+1. DONE. Add tests for absolute imports, relative imports, package imports, star imports, unresolved imports, and type-checking imports.
+2. DONE. Revisit the resolver behavior for:
+   - `from . import *`
+   - `from .. import x`
+   - unresolved relative imports
+   - package `__init__.py`
+3. DONE. Clean up return types and mypy issues.
+4. DONE. Decide how much namespace package support is expected.
 
 ### Files likely to change
 
 - `netimport_lib/imports_reader.py`
 - `netimport_lib/graph_builder/resolver_imports.py`
+- `netimport_lib/graph_builder/graph_builder.py`
 - new tests
 
 ### Notes for implementer
@@ -582,12 +625,18 @@ This section is the implementation backlog for another LLM or engineer.
 
 ## Workstream 6. Expand tests to real product behavior
 
+### Status
+
+Partially implemented. Core product behavior is now covered for config loading,
+CLI behavior, summary output, and resolver edge cases. Demo tests still need
+review.
+
 ### Tasks
 
-1. Add config loader tests.
-2. Add CLI integration tests.
-3. Add summary tests.
-4. Add resolver edge-case tests.
+1. DONE. Add config loader tests.
+2. DONE. Add CLI integration tests.
+3. DONE. Add summary tests.
+4. DONE. Add resolver edge-case tests.
 5. Review or remove weak demo tests.
 
 ### Files likely to change

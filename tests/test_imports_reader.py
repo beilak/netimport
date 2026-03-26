@@ -30,3 +30,52 @@ from . import *
     assert "package.module" in imports
     assert "package" in imports
     assert "." in imports
+
+
+def test_get_imported_modules_skips_type_checking_imports_by_default(tmp_path: Path) -> None:
+    dummy_file = tmp_path / "dummy_type_checking.py"
+    dummy_file.write_text(
+        """
+from typing import TYPE_CHECKING
+import os
+import typing
+
+if TYPE_CHECKING:
+    import pandas
+
+if typing.TYPE_CHECKING:
+    from app import models
+"""
+    )
+
+    imports = get_imported_modules_as_strings(str(dummy_file))
+
+    assert "os" in imports
+    assert "typing" in imports
+    assert "typing.TYPE_CHECKING" in imports
+    assert "pandas" not in imports
+    assert "app.models" not in imports
+
+
+def test_get_imported_modules_can_include_type_checking_imports(tmp_path: Path) -> None:
+    dummy_file = tmp_path / "dummy_type_checking.py"
+    dummy_file.write_text(
+        """
+from typing import TYPE_CHECKING
+import typing
+
+if TYPE_CHECKING:
+    import pandas
+
+if typing.TYPE_CHECKING:
+    from app import models
+"""
+    )
+
+    imports = get_imported_modules_as_strings(
+        str(dummy_file),
+        include_type_checking_imports=True,
+    )
+
+    assert "pandas" in imports
+    assert "app.models" in imports

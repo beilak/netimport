@@ -100,6 +100,14 @@ def test_format_summary_includes_numeric_coupling_metrics() -> None:
         "+------+----------+---------------------+",
         "| 1    | .missing | unresolved_relative |",
         "+------+----------+---------------------+",
+        "",
+        "Policy Violations",
+        "=================",
+        "+------+---------+",
+        "| Rule | Message |",
+        "+------+---------+",
+        "| None | -       |",
+        "+------+---------+",
     ]
 
 
@@ -162,6 +170,7 @@ def test_build_summary_payload_returns_structured_data() -> None:
         "unresolved_imports": [
             {"rank": 1, "import_name": ".missing", "type": "unresolved_relative"}
         ],
+        "violations": [],
     }
 
 

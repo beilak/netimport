@@ -129,6 +129,37 @@ def test_build_dependency_graph_resolves_relative_package_imports(tmp_path: Path
     assert actual_edges == {("pkg/module.py", "pkg/__init__.py")}
 
 
+def test_build_dependency_graph_resolves_package_prefixed_absolute_imports(
+    tmp_path: Path,
+) -> None:
+    project_root = tmp_path / "project"
+    package_dir = project_root / "pkg"
+    package_dir.mkdir(parents=True)
+
+    file_imports_map = {
+        str(project_root / "main.py"): ["project.pkg.module.ClassName"],
+        str(package_dir / "module.py"): [],
+    }
+
+    ignore_config = IgnoreConfigNode(
+        nodes=set(),
+        stdlib=False,
+        external_lib=False,
+    )
+
+    graph = build_dependency_graph(
+        file_imports_map=file_imports_map,
+        project_root=str(project_root),
+        ignore=ignore_config,
+    )
+
+    actual_edges = {
+        (_relative_path(source_node, project_root), _relative_path(target_node, project_root))
+        for source_node, target_node in graph.edges()
+    }
+    assert actual_edges == {("main.py", "pkg/module.py")}
+
+
 def test_build_dependency_graph_adds_unresolved_relative_too_many_dots_nodes(
     tmp_path: Path,
 ) -> None:

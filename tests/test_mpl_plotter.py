@@ -66,7 +66,10 @@ def test_prepare_mpl_render_rejects_unsupported_layout() -> None:
         mpl_plotter.prepare_mpl_render(graph, "grid")
 
 
-@pytest.mark.parametrize("layout", ("spring", "circular", "shell", "planar_layout"))
+@pytest.mark.parametrize(
+    "layout",
+    ["spring", "circular", "shell", "planar_layout"],
+)
 def test_prepare_mpl_render_supports_each_registered_layout(layout: str) -> None:
     graph = _build_sample_graph()
 
@@ -80,7 +83,7 @@ def test_prepare_mpl_render_rejects_non_planar_graph_for_planar_layout() -> None
 
     with pytest.raises(
         ValueError,
-        match="Matplotlib layout 'planar_layout' requires a planar graph.",
+        match=r"Matplotlib layout 'planar_layout' requires a planar graph\.",
     ):
         mpl_plotter.prepare_mpl_render(graph, "planar_layout")
 

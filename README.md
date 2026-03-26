@@ -219,10 +219,10 @@ Dependency Graph Summary
 +--------------------------+-------+
 | Metric                   | Value |
 +--------------------------+-------+
-| Nodes                    | 9     |
-| Edges                    | 8     |
-| Project files            | 9     |
-| Standard library modules | 0     |
+| Nodes                    | 14    |
+| Edges                    | 18    |
+| Project files            | 11    |
+| Standard library modules | 3     |
 | External libraries       | 0     |
 | Unresolved imports       | 0     |
 +--------------------------+-------+
@@ -232,10 +232,10 @@ Project Coupling Metrics
 +------------------------+------+--------+-----+-----+
 | Metric                 | Avg  | Median | Min | Max |
 +------------------------+------+--------+-----+-----+
-| Project files analyzed | 9    | -      | -   | -   |
-| Incoming degree        | 0.89 | 1.00   | 0   | 2   |
-| Outgoing degree        | 0.89 | 1.00   | 0   | 4   |
-| Total degree           | 1.78 | 2.00   | 0   | 4   |
+| Project files analyzed | 11   | -      | -   | -   |
+| Incoming degree        | 0.91 | 1.00   | 0   | 3   |
+| Outgoing degree        | 1.64 | 1.00   | 0   | 5   |
+| Total degree           | 2.55 | 2.00   | 0   | 5   |
 +------------------------+------+--------+-----+-----+
 ```
 

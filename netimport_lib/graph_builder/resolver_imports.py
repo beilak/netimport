@@ -171,6 +171,16 @@ def _resolve_absolute_import(
     if resolved_path is not None:
         return NodeInfo(resolved_path, "project_file")
 
+    project_package_name = project_root_path.name
+    if absolute_module_parts[0] == project_package_name:
+        resolved_path = _resolve_longest_project_prefix(
+            project_root_path,
+            absolute_module_parts[1:],
+            project_files_normalized,
+        )
+        if resolved_path is not None:
+            return NodeInfo(resolved_path, "project_file")
+
     root_module_name = absolute_module_parts[0]
     if root_module_name in STANDARD_LIB_MODULES:
         return NodeInfo(root_module_name, "std_lib")

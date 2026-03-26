@@ -55,7 +55,7 @@ The following checks were run during audit:
 
 Observed results:
 
-- `pytest` now passes: `46 passed`
+- `pytest` now passes: `66 passed`
 - `mypy .` now passes in strict mode
 - `ruff check .` now passes
 - CLI help works
@@ -63,6 +63,7 @@ Observed results:
 - `netimport example --show-console-summary` now prints a deterministic console report
 - `netimport example --show-console-summary --summary-format json --no-show-graph` now prints a deterministic JSON report
 - `python -m netimport_lib.cli --help` now works
+- help and summary-only paths no longer emit Matplotlib/fontconfig warnings on stderr
 
 ## Problems
 

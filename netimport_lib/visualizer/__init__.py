@@ -1,13 +1,11 @@
 """Visualizer registry and contracts."""
 
+import importlib
 from collections.abc import Callable
 from dataclasses import dataclass
 from typing import Final
 
 import networkx as nx
-
-from netimport_lib.visualizer.bokeh_plotter_v2 import draw_bokeh_graph
-from netimport_lib.visualizer.mpl_plotter import draw_graph_mpl
 
 
 GraphRenderFunc = Callable[[nx.DiGraph, str], None]
@@ -23,6 +21,22 @@ class GraphVisualizer:
     default_layout: str
 
 
+def _render_bokeh(graph: nx.DiGraph, layout: str) -> None:
+    draw_bokeh_graph = importlib.import_module(
+        "netimport_lib.visualizer.bokeh_plotter_v2"
+    ).draw_bokeh_graph
+
+    draw_bokeh_graph(graph, layout)
+
+
+def _render_mpl(graph: nx.DiGraph, layout: str) -> None:
+    draw_graph_mpl = importlib.import_module(
+        "netimport_lib.visualizer.mpl_plotter"
+    ).draw_graph_mpl
+
+    draw_graph_mpl(graph, layout)
+
+
 MPL_LAYOUTS: Final[tuple[str, ...]] = (
     "spring",
     "circular",
@@ -33,13 +47,13 @@ BOKEH_LAYOUTS: Final[tuple[str, ...]] = ("constrained",)
 GRAPH_VISUALIZERS: Final[dict[str, GraphVisualizer]] = {
     "bokeh": GraphVisualizer(
         name="bokeh",
-        render=draw_bokeh_graph,
+        render=_render_bokeh,
         supported_layouts=BOKEH_LAYOUTS,
         default_layout="constrained",
     ),
     "mpl": GraphVisualizer(
         name="mpl",
-        render=draw_graph_mpl,
+        render=_render_mpl,
         supported_layouts=MPL_LAYOUTS,
         default_layout="spring",
     ),

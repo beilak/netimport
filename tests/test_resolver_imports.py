@@ -84,6 +84,20 @@ def _normalized_project_files(project_root: Path, *relative_paths: str) -> set[s
             expected_relative_id="pkg/__init__.py",
             expected_type="project_file",
         ),
+        _ProjectResolutionCase(
+            import_str="project.pkg.module.ClassName",
+            source_file="main.py",
+            project_files=("main.py", "pkg/module.py"),
+            expected_relative_id="pkg/module.py",
+            expected_type="project_file",
+        ),
+        _ProjectResolutionCase(
+            import_str="project",
+            source_file="main.py",
+            project_files=("main.py", "__init__.py"),
+            expected_relative_id="__init__.py",
+            expected_type="project_file",
+        ),
     ],
 )
 def test_resolve_import_string_resolves_project_modules(
@@ -91,6 +105,7 @@ def test_resolve_import_string_resolves_project_modules(
     case: _ProjectResolutionCase,
 ) -> None:
     project_root = tmp_path / "project"
+    project_root.mkdir()
 
     resolved = resolve_import_string(
         case.import_str,

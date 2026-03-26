@@ -21,6 +21,8 @@ def test_load_config_returns_defaults_without_netimport_section(tmp_path: Path) 
         "ignored_files": set(),
         "ignore_stdlib": False,
         "ignore_external_lib": False,
+        "fail_on_unresolved_imports": False,
+        "forbidden_external_libs": set(),
     }
 
 

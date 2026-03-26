@@ -28,6 +28,10 @@ def _write_pyproject_config(project_root: Path, config_body: str) -> None:
     )
 
 
+def _write_explicit_config(config_path: Path, config_body: str) -> None:
+    config_path.write_text(config_body, encoding="utf-8")
+
+
 def _build_recording_visualizer(
     name: str,
     supported_layouts: tuple[str, ...],
@@ -299,6 +303,7 @@ def test_cli_help_lists_only_supported_visualizers_and_layouts() -> None:
     result = runner.invoke(cli.main, ["--help"])
 
     assert result.exit_code == 0
+    assert "--config FILE" in result.output
     assert "--show-graph [bokeh|mpl]" in result.output
     assert "--layout [constrained|spring|circular|shell|planar_layout]" in result.output
     assert "--summary-format [text|json]" in result.output
@@ -395,6 +400,122 @@ def test_cli_applies_ignored_files_from_config(monkeypatch: MonkeyPatch, tmp_pat
 
     assert result.exit_code == 0
     assert "| Project files            | 1     |" in result.output
+
+
+def test_cli_explicit_config_overrides_project_config(
+    monkeypatch: MonkeyPatch,
+    tmp_path: Path,
+) -> None:
+    project_root = tmp_path / "target_project"
+    project_root.mkdir()
+    _write_pyproject_config(
+        project_root,
+        "\n[tool.netimport]\nignored_dirs = ['from_project']\nignore_stdlib = true\n",
+    )
+
+    explicit_config_path = tmp_path / "netimport.override.toml"
+    _write_explicit_config(
+        explicit_config_path,
+        "ignored_dirs = ['from_explicit']\nignore_stdlib = false\n",
+    )
+
+    (project_root / "main.py").write_text("import os\nimport helper\n", encoding="utf-8")
+    (project_root / "helper.py").write_text("", encoding="utf-8")
+
+    project_ignored_dir = project_root / "from_project"
+    project_ignored_dir.mkdir()
+    (project_ignored_dir / "project_hidden.py").write_text("", encoding="utf-8")
+
+    explicit_ignored_dir = project_root / "from_explicit"
+    explicit_ignored_dir.mkdir()
+    (explicit_ignored_dir / "explicit_hidden.py").write_text("", encoding="utf-8")
+
+    monkeypatch.setattr(cli, "GRAPH_VISUALIZERS", {})
+
+    runner: Final[CliRunner] = CliRunner()
+    result = runner.invoke(
+        cli.main,
+        [
+            str(project_root),
+            "--config",
+            str(explicit_config_path),
+            "--show-console-summary",
+            "--no-show-graph",
+        ],
+    )
+
+    assert result.exit_code == 0
+    assert "| Project files            | 3     |" in result.output
+    assert "| Standard library modules | 1     |" in result.output
+
+
+def test_cli_flags_override_explicit_config(monkeypatch: MonkeyPatch, tmp_path: Path) -> None:
+    project_root = tmp_path / "target_project"
+    project_root.mkdir()
+
+    explicit_config_path = tmp_path / "netimport.override.toml"
+    _write_explicit_config(
+        explicit_config_path,
+        "ignored_dirs = ['from_explicit']\nignore_stdlib = true\n",
+    )
+
+    (project_root / "main.py").write_text("import os\nimport helper\n", encoding="utf-8")
+    (project_root / "helper.py").write_text("", encoding="utf-8")
+
+    explicit_ignored_dir = project_root / "from_explicit"
+    explicit_ignored_dir.mkdir()
+    (explicit_ignored_dir / "explicit_hidden.py").write_text("", encoding="utf-8")
+
+    cli_ignored_dir = project_root / "from_cli"
+    cli_ignored_dir.mkdir()
+    (cli_ignored_dir / "cli_hidden.py").write_text("", encoding="utf-8")
+
+    monkeypatch.setattr(cli, "GRAPH_VISUALIZERS", {})
+
+    runner: Final[CliRunner] = CliRunner()
+    result = runner.invoke(
+        cli.main,
+        [
+            str(project_root),
+            "--config",
+            str(explicit_config_path),
+            "--ignored-dir",
+            "from_cli",
+            "--include-stdlib",
+            "--show-console-summary",
+            "--no-show-graph",
+        ],
+    )
+
+    assert result.exit_code == 0
+    assert "| Project files            | 2     |" in result.output
+    assert "| Standard library modules | 1     |" in result.output
+
+
+def test_cli_rejects_explicit_config_without_netimport_keys(
+    monkeypatch: MonkeyPatch,
+    tmp_path: Path,
+) -> None:
+    project_root = tmp_path / "target_project"
+    project_root.mkdir()
+    (project_root / "main.py").write_text("", encoding="utf-8")
+
+    explicit_config_path = tmp_path / "custom.toml"
+    _write_explicit_config(
+        explicit_config_path,
+        "[project]\nname = 'sample-project'\nversion = '0.1.0'\n",
+    )
+
+    monkeypatch.setattr(cli, "GRAPH_VISUALIZERS", {})
+
+    runner: Final[CliRunner] = CliRunner()
+    result = runner.invoke(
+        cli.main,
+        [str(project_root), "--config", str(explicit_config_path), "--no-show-graph"],
+    )
+
+    assert result.exit_code != 0
+    assert "does not contain NetImport config" in result.output
 
 
 def test_cli_works_without_tool_netimport_config(

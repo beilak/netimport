@@ -569,7 +569,7 @@ This section is the implementation backlog for another LLM or engineer.
 2. DONE. Load config from target project.
 3. DONE. Add `.netimport.toml` support.
 4. DONE. Apply `ignored_files`.
-5. Add `--config` support if the README contract should be preserved.
+5. DONE. Add `--config` support and document explicit config precedence.
 6. Decide whether `--show-console-summary` should default to `False` instead of `True`.
 7. DONE. Add `__main__` support.
 
@@ -585,6 +585,37 @@ This section is the implementation backlog for another LLM or engineer.
 - Keep precedence deterministic and documented.
 - Prefer small pure functions in config loading so tests stay simple.
 - Use `click.testing.CliRunner` for CLI tests.
+
+### Progress update
+
+Implemented in:
+
+- `netimport_lib/config_loader.py`
+- `netimport_lib/cli.py`
+- `tests/test_config_loader.py`
+- `tests/test_cli.py`
+- `README.md`
+
+Done:
+
+1. Added `--config` support for explicit TOML files.
+2. Allowed explicit config files to use either top-level NetImport keys or a `[tool.netimport]` section.
+3. Defined and documented precedence explicitly:
+   - defaults
+   - `pyproject.toml`
+   - `.netimport.toml`
+   - explicit `--config`
+   - CLI options
+4. Added tests covering:
+   - explicit config overriding project config
+   - CLI flags overriding explicit config
+   - explicit config validation errors
+
+Acceptance criteria:
+
+- `netimport <project> --config <file>` loads and applies explicit config deterministically
+- README matches the implemented precedence and file shapes
+- tests cover the main precedence and validation paths
 
 ## DONE. Workstream 2. Implement useful non-GUI output
 

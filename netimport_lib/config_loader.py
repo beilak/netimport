@@ -101,10 +101,11 @@ def _parse_config_object(app_config: Mapping[str, object]) -> PartialNetImportCo
     return parsed_config
 
 
-def _merge_config(
+def merge_config(
     base_config: NetImportConfigMap,
     override_config: PartialNetImportConfigMap,
 ) -> NetImportConfigMap:
+    """Return a full config with a partial override applied on top."""
     ignored_nodes = set(base_config["ignored_nodes"])
     ignored_dirs = set(base_config["ignored_dirs"])
     ignored_files = set(base_config["ignored_files"])
@@ -131,20 +132,40 @@ def _merge_config(
     )
 
 
+def _load_toml_table(config_path: Path) -> Mapping[str, object]:
+    with config_path.open(encoding="utf-8") as file_handle:
+        data = toml.load(file_handle)
+
+    if not isinstance(data, Mapping):
+        raise TypeError(f"Config file '{config_path}' must contain a TOML table.")
+
+    return data
+
+
+def _get_pyproject_app_config(data: Mapping[str, object]) -> Mapping[str, object] | None:
+    tool_section = data.get(TOOL_SECTION_NAME)
+    if not isinstance(tool_section, Mapping):
+        return None
+
+    app_config = tool_section.get(APP_CONFIG_SECTION_NAME)
+    if not isinstance(app_config, Mapping):
+        return None
+
+    return app_config
+
+
+def _contains_known_config_keys(data: Mapping[str, object]) -> bool:
+    return any(key in data for key in KNOWN_CONFIG_KEYS)
+
+
 def _load_pyproject_config(project_root: Path) -> PartialNetImportConfigMap:
     pyproject_path = project_root / PYPROJECT_TOML_FILE
     if not pyproject_path.exists():
         return {}
 
-    with pyproject_path.open(encoding="utf-8") as file_handle:
-        data = toml.load(file_handle)
-
-    tool_section = data.get(TOOL_SECTION_NAME)
-    if not isinstance(tool_section, Mapping):
-        return {}
-
-    app_config = tool_section.get(APP_CONFIG_SECTION_NAME)
-    if not isinstance(app_config, Mapping):
+    data = _load_toml_table(pyproject_path)
+    app_config = _get_pyproject_app_config(data)
+    if app_config is None:
         return {}
 
     return _parse_config_object(app_config)
@@ -155,13 +176,26 @@ def _load_netimport_config(project_root: Path) -> PartialNetImportConfigMap:
     if not config_path.exists():
         return {}
 
-    with config_path.open(encoding="utf-8") as file_handle:
-        data = toml.load(file_handle)
-
-    if not isinstance(data, Mapping):
-        raise TypeError(f"Config file '{config_path}' must contain a TOML table.")
-
+    data = _load_toml_table(config_path)
     return _parse_config_object(data)
+
+
+def load_explicit_config(config_path: str | Path) -> PartialNetImportConfigMap:
+    """Load a NetImport override config from an explicit TOML file path."""
+    resolved_config_path: Final[Path] = Path(config_path).resolve()
+    data = _load_toml_table(resolved_config_path)
+
+    app_config = _get_pyproject_app_config(data)
+    if app_config is not None:
+        return _parse_config_object(app_config)
+
+    if _contains_known_config_keys(data):
+        return _parse_config_object(data)
+
+    raise ValueError(
+        f"Config file '{resolved_config_path}' does not contain NetImport config. "
+        "Expected [tool.netimport] or top-level NetImport keys."
+    )
 
 
 def load_config(project_root: str) -> NetImportConfigMap:
@@ -170,7 +204,7 @@ def load_config(project_root: str) -> NetImportConfigMap:
     pyproject_config = _load_pyproject_config(project_root_path)
     dot_netimport_config = _load_netimport_config(project_root_path)
 
-    return _merge_config(
-        _merge_config(default_config(), pyproject_config),
+    return merge_config(
+        merge_config(default_config(), pyproject_config),
         dot_netimport_config,
     )

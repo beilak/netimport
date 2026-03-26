@@ -10,7 +10,7 @@ It is intended for architecture inspection, refactoring support, and CI-friendly
 *   **Dependency Graph Construction:** Creates a directed graph where nodes represent project modules/packages, as well as external and standard libraries. Edges depict the imports between them.
 *   **Graph Visualization:** Supports an interactive Bokeh view and a static Matplotlib view with explicit backend/layout compatibility.
 *   **Console Summary:** Prints a deterministic text report with project-level counts and coupling tables.
-*   **Configuration via CLI and TOML files:** Supports CLI overrides plus config from `[tool.netimport]` in `pyproject.toml` or `.netimport.toml`.
+*   **Configuration via CLI and TOML files:** Supports CLI overrides plus config from `[tool.netimport]` in `pyproject.toml`, `.netimport.toml`, or an explicit `--config` TOML file.
 *   **Dependency Type Identification:** Distinguishes imports of internal project modules, Python standard libraries, and external third-party dependencies.
 
 ## Why Use NetImport?
@@ -28,7 +28,7 @@ NetImport currently supports:
 *   Static analysis of Python source trees based on AST-parsed `import` statements.
 *   Deterministic console summaries for headless runs and CI-oriented inspection.
 *   Explicit visualizer backend/layout combinations documented in the CLI and README.
-*   Configuration from `[tool.netimport]` in `pyproject.toml`, `.netimport.toml`, and CLI overrides.
+*   Configuration from `[tool.netimport]` in `pyproject.toml`, `.netimport.toml`, explicit `--config` files, and CLI overrides.
 
 ## Installation
 
@@ -59,6 +59,10 @@ Path to the root directory of the Python project to analyze.
 `--layout [constrained|spring|circular|shell|planar_layout]`
 
 Choose a layout name for the selected graph backend. If omitted, NetImport uses the backend default.
+
+`--config FILE`
+
+Load an explicit TOML config file and apply it after project config has been loaded from the analyzed project. The file may either contain top-level NetImport keys or a `[tool.netimport]` section.
 
 `--show-graph [bokeh|mpl]`
 
@@ -194,6 +198,14 @@ Use this in CI or scripts when you want a stable machine-readable dependency rep
 poetry run netimport example --show-console-summary --summary-format json --no-show-graph
 ```
 
+Explicit config file
+
+Use this when you want to keep a reusable analysis profile outside the analyzed project root, or when CI should point NetImport at a dedicated config file.
+
+```bash
+poetry run netimport example --config ci/netimport.toml --show-console-summary --no-show-graph
+```
+
 Example summary output:
 
 ```text
@@ -231,15 +243,17 @@ Supported config files:
 
 - `[tool.netimport]` in `pyproject.toml`
 - `.netimport.toml`
+- explicit TOML file passed via `--config`
 
 Precedence:
 
 1. built-in defaults
 2. `pyproject.toml`
 3. `.netimport.toml`
-4. CLI options
+4. explicit `--config` file
+5. CLI options
 
-For collection options (`ignored_dirs`, `ignored_files`, `ignored_nodes`), CLI values are added on top of file config values. For boolean options (`ignore_stdlib`, `ignore_external_lib`), explicit CLI flags override file config values.
+For collection options (`ignored_dirs`, `ignored_files`, `ignored_nodes`), later file-based config replaces earlier file-based values, and CLI values are added on top at the final step. For boolean options (`ignore_stdlib`, `ignore_external_lib`), later config sources replace earlier ones, and explicit CLI flags override file config values.
 
 Supported keys:
 
@@ -268,6 +282,24 @@ ignored_files = ["setup.py"]
 ignore_stdlib = false
 ignore_external_lib = false
 ignored_nodes = []
+```
+
+Explicit `--config` example using top-level keys:
+
+```toml
+ignored_dirs = ["generated"]
+ignored_files = ["bootstrap.py"]
+ignore_stdlib = true
+ignore_external_lib = false
+ignored_nodes = ["requests"]
+```
+
+Explicit `--config` can also point to a `pyproject.toml`-style file:
+
+```toml
+[tool.netimport]
+ignored_dirs = ["generated"]
+ignore_stdlib = true
 ```
 
 ## Current Limitations

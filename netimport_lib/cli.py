@@ -6,7 +6,12 @@ from pathlib import Path
 import click
 import networkx as nx
 
-from netimport_lib.config_loader import NetImportConfigMap, load_config
+from netimport_lib.config_loader import (
+    NetImportConfigMap,
+    load_config,
+    load_explicit_config,
+    merge_config,
+)
 from netimport_lib.graph_builder.graph_builder import IgnoreConfigNode, build_dependency_graph
 from netimport_lib.imports_reader import get_imported_modules_as_strings
 from netimport_lib.project_file_reader import find_python_files
@@ -31,6 +36,13 @@ class _CliOverrides:
 
 @click.command()
 @click.argument("project_path", type=str)
+@click.option(
+    "--config",
+    "config_path",
+    type=click.Path(exists=True, dir_okay=False, path_type=Path),
+    default=None,
+    help="Load an explicit TOML config file and apply it after project config.",
+)
 @click.option(
     "--layout",
     type=click.Choice(GRAPH_LAYOUT_CHOICES, case_sensitive=False),
@@ -108,6 +120,7 @@ class _CliOverrides:
 )
 def main(  # noqa: PLR0913
     project_path: str,
+    config_path: Path | None = None,
     layout: str | None = None,
     show_graph: str = DEFAULT_VISUALIZER,
     no_show_graph: bool = False,
@@ -121,9 +134,10 @@ def main(  # noqa: PLR0913
 ) -> None:
     """Analyze a Python project and optionally visualize its dependency graph."""
     project_root = str(Path(project_path).resolve())
-    loaded_config = _merge_cli_config(
-        load_config(project_root),
-        _CliOverrides(
+    loaded_config = _load_cli_config(
+        project_root=project_root,
+        config_path=config_path,
+        cli_overrides=_CliOverrides(
             ignored_dirs=ignored_dirs,
             ignored_files=ignored_files,
             ignored_nodes=ignored_nodes,
@@ -177,6 +191,21 @@ def _remove_isolated_init_nodes(dependency_graph: nx.DiGraph) -> None:
     ]
     if nodes_to_remove:
         dependency_graph.remove_nodes_from(nodes_to_remove)
+
+
+def _load_cli_config(
+    project_root: str,
+    config_path: Path | None,
+    cli_overrides: _CliOverrides,
+) -> NetImportConfigMap:
+    try:
+        loaded_config = load_config(project_root)
+        if config_path is not None:
+            loaded_config = merge_config(loaded_config, load_explicit_config(config_path))
+    except (OSError, TypeError, ValueError) as exc:
+        raise click.ClickException(str(exc)) from exc
+
+    return _merge_cli_config(loaded_config, cli_overrides)
 
 
 def _merge_cli_config(

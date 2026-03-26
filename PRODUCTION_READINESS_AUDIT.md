@@ -35,8 +35,7 @@ The core idea is implemented and the basic graph-building flow exists:
 What is missing is the product layer around that core:
 
 - config behavior is not trustworthy yet
-- CLI contract does not match README
-- summary output is effectively not implemented
+- some documentation still needs follow-up, but core CLI usage is now documented
 - type checks and lints are not green
 - test coverage is too shallow for a production CLI tool
 - visualizer behavior is only partially aligned with CLI options
@@ -62,7 +61,7 @@ Observed results:
 - `ruff` failed with 16 findings
 - CLI help works
 - `netimport example` exits successfully
-- `netimport example --show-console-summary` exits successfully but prints nothing
+- `netimport example --show-console-summary` now prints a deterministic console report
 
 ## Problems
 
@@ -190,104 +189,55 @@ find_python_files(
 - a file listed in config is excluded from analysis
 - tests verify that exclusion
 
-## P1. Summary output is not implemented
+## DONE. P1. Summary output is implemented
 
-### Why it matters
+### Status
 
-The CLI exposes `--show-console-summary`, but users currently get no useful report.
+Implemented in `netimport_lib/summary_builder.py` and covered by tests.
 
-### Where
+### Done
 
-- `netimport_lib/summary_builder.py`
-
-### Evidence
-
-Several functions are placeholders:
-
-- `print_header()`
-- `print_external_dependencies()` loop body
-- "top 10" functions compute values but do not print them
-- link statistics function computes degrees but outputs nothing
-
-### Consequence
-
-- one of the main non-GUI use cases is effectively broken
-- CI/headless environments get no value from summary mode
-
-### Suggested implementation
-
-Implement a stable textual summary format, for example:
-
-1. Header with project stats:
-   - total nodes
-   - project files
-   - stdlib nodes
-   - external libs
-   - edges
-2. Top incoming links
-3. Top outgoing links
-4. External dependencies list
-5. Unresolved imports list
-
-Use deterministic sorting so output is testable.
+1. Added deterministic console summary output.
+2. Added numeric tables for:
+   - graph overview
+   - project coupling metrics
+   - most/least coupled project files
+   - most depended-on project files
+   - most dependent project files
+   - external dependencies
+   - unresolved imports
+3. Added tests for formatter output.
+4. Added CLI tests for summary output.
+5. Added `--no-show-graph` so summary can be used without opening visualization.
 
 ### Acceptance criteria
 
 - `poetry run netimport example --show-console-summary` prints a meaningful report
 - output is deterministic
-- tests assert exact or near-exact lines
+- tests assert exact lines for formatter and CLI output
 
-## P1. README and actual CLI contract do not match
+## DONE. P1. README and actual CLI contract are aligned
 
-### Why it matters
+### Status
 
-Users trust `README.md` as the product contract.
+`README.md` has been updated to reflect the current CLI.
 
-### Where
+### Done
 
-- `README.md`
-- `netimport_lib/cli.py`
-
-### Evidence
-
-README documents options that do not exist:
-
-- `--output-graph`
-- `--config`
-- `--ignored-dirs`
-- `--ignored-files`
-- `--export-dot`
-- `--export-mermaid`
-
-Actual CLI help currently exposes:
-
-- `--layout`
-- `--show-graph`
-- `--show-console-summary`
-
-### Consequence
-
-- first-run user experience is broken
-- generated support burden increases
-- it becomes unclear what the intended roadmap vs current feature set is
-
-### Suggested implementation
-
-Choose one of two paths:
-
-1. Minimal honesty path:
-   - remove undocumented/unimplemented options from README
-   - document only current behavior
-2. Product path:
-   - implement the promised options
-   - add tests and examples
-
-Recommendation: take the product path if production readiness is the goal.
+1. Removed undocumented options from README usage examples.
+2. Documented actual supported CLI options:
+   - `--layout`
+   - `--show-graph`
+   - `--no-show-graph`
+   - `--show-console-summary`
+3. Added real launch examples.
+4. Added a real example of console summary output.
+5. Updated configuration docs to match the current implementation contract.
 
 ### Acceptance criteria
 
-- `README.md` and `netimport --help` describe the same interface
-- every documented option has implementation and tests
+- `README.md` and `netimport --help` describe the same interface for current supported options
+- examples reflect the real command behavior
 
 ## P1. Quality gates are not green
 

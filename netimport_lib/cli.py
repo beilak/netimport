@@ -47,15 +47,22 @@ IGNORE_NODES: set = set()
     show_default=True,
 )
 @click.option(
+    "--no-show-graph",
+    is_flag=True,
+    default=False,
+    help="Disable graph visualization even if a graph backend is configured.",
+)
+@click.option(
     "--show-console-summary",
     is_flag=True,
-    default=True,
+    default=False,
     help="Show a summary of the project dependencies in the console.",
 )
 def main(
     project_path: str,
     layout: str,
     show_graph: str | None = "bokeh",
+    no_show_graph: bool = False,
     show_console_summary: bool = False,
 ) -> None:
     loaded_config: NetImportConfigMap = load_config(".")
@@ -91,7 +98,7 @@ def main(
     if nodes_to_remove:
         dependency_graph.remove_nodes_from(nodes_to_remove)
 
-    if show_graph and (visualizer := GRAPH_VISUALIZERS.get(show_graph)):
+    if not no_show_graph and show_graph and (visualizer := GRAPH_VISUALIZERS.get(show_graph)):
         visualizer(dependency_graph, layout)
 
     if show_console_summary:

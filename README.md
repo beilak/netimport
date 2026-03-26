@@ -7,7 +7,8 @@ NetImport is a static analysis tool for Python projects that helps developers vi
 *   **Import Analysis:** Recursively scans the specified project directory for Python files and parses their `import` statements.
 *   **Dependency Graph Construction:** Creates a directed graph where nodes represent project modules/packages, as well as external and standard libraries. Edges depict the imports between them.
 *   **Graph Visualization:** Integrates with Matplotlib to generate visual representations of the dependency graph, facilitating easier analysis.
-*   **Flexible Configuration:** Allows customization of ignored directories and files via the command line, an `.netimport.toml` file, or `pyproject.toml`.
+*   **Console Summary:** Prints a deterministic text report with project-level counts and coupling tables.
+*   **Configuration via `pyproject.toml`:** Supports `[tool.netimport]` settings for ignored directories, ignored files, stdlib filtering, external library filtering, and ignored nodes.
 *   **Dependency Type Identification:** Distinguishes imports of internal project modules, Python standard libraries, and external third-party dependencies.
 
 ## Why Use NetImport?
@@ -38,57 +39,106 @@ netimport [OPTIONS] <PROJECT_PATH>
 ```
 
 
-### Key Options:
+### Current CLI Options
 
-<PROJECT_PATH>: Path to the root directory of your Python project to be analyzed.
+`PROJECT_PATH`
 
---output-graph FILENAME.PNG: Save the graph visualization to the specified file (e.g., dependencies.png).
+Path to the root directory of the Python project to analyze.
 
---show-graph: Display the graph using Matplotlib (requires a GUI environment).
+`--layout [planar_layout|spring|kamada_kawai|circular|spectral|shell|dot|neato|fdp|sfdp]`
 
---config FILEPATH: Path to a custom configuration file (instead of .netimport.toml or pyproject.toml).
+Choose a layout name for the graph backend.
 
---ignored-dirs DIR1,DIR2: Comma-separated list of directories to ignore, overrides configuration files.
+`--show-graph [bokeh|mpl]`
 
---ignored-files FILE1,FILE2: Comma-separated list of files to ignore.
+Select the visualization backend. Current default is `bokeh`.
 
---show-console-summary: Print a textual summary of the graph to the console.
+`--no-show-graph`
 
---export-dot FILENAME.DOT: Export the graph in DOT format for use with Graphviz.
+Disable graph visualization even if a graph backend is configured. This is useful for CI, terminals, or summary-only runs.
 
---export-mermaid FILENAME.MD: Export the graph in Mermaid syntax.
+`--show-console-summary`
 
---layout ALGORITHM_NAME: Choose a graph layout algorithm for visualization (e.g., spring, kamada_kawai, circular; or dot, neato if Graphviz is used).
+Print a textual dependency report with tables for:
 
+- overall graph counts
+- project coupling metrics
+- most/least coupled project files
+- most depended-on project files
+- most dependent project files
+- external dependencies
+- unresolved imports
 
-### Example:
+### Examples
+
+Open the graph for a project using the default backend:
 
 ```bash
-netimport ./my_python_project --output-graph project_deps.png --layout spring
+poetry run netimport example
+```
+
+Print only the console summary and do not open the browser:
+
+```bash
+poetry run netimport example --show-console-summary --no-show-graph
+```
+
+Use the Matplotlib backend explicitly:
+
+```bash
+poetry run netimport example --show-graph mpl
+```
+
+Example summary output:
+
+```text
+Dependency Graph Summary
+========================
++--------------------------+-------+
+| Metric                   | Value |
++--------------------------+-------+
+| Nodes                    | 9     |
+| Edges                    | 8     |
+| Project files            | 9     |
+| Standard library modules | 0     |
+| External libraries       | 0     |
+| Unresolved imports       | 0     |
++--------------------------+-------+
+
+Project Coupling Metrics
+========================
++------------------------+------+--------+-----+-----+
+| Metric                 | Avg  | Median | Min | Max |
++------------------------+------+--------+-----+-----+
+| Project files analyzed | 9    | -      | -   | -   |
+| Incoming degree        | 0.89 | 1.00   | 0   | 2   |
+| Outgoing degree        | 0.89 | 1.00   | 0   | 4   |
+| Total degree           | 1.78 | 2.00   | 0   | 4   |
++------------------------+------+--------+-----+-----+
 ```
 
 
 ### Configuration
 
-NetImport looks for configuration files in the following order of precedence:
+Current implementation reads configuration from the `[tool.netimport]` section in `pyproject.toml` in the current working directory.
 
-- Command-line arguments.
-- An .netimport.toml file in the project root.
-- The [tool.netimport] section in a pyproject.toml file in the project root.
-- Default values. (Maybe. I'm still thinking.)
+Supported keys:
 
-Example .netimport.toml or pyproject.toml ([tool.netimport]):
+- `ignored_dirs`
+- `ignored_files`
+- `ignore_stdlib`
+- `ignore_external_lib`
+- `ignored_nodes`
+
+Example:
 
 ```
+[tool.netimport]
 ignored_dirs = ["venv", ".venv", "tests", "docs", "__pycache__", "node_modules", "migrations"]
 ignored_files = ["setup.py", "manage.py"]
 ignore_stdlib = true
 ignore_external_lib = true
 ignored_nodes = []
-# Other planned or potential settings:
-# default_layout_algorithm = "spring"
-# exclude_std_lib_from_graph = false
-# exclude_external_libs_from_graph = false
 ```
 
 

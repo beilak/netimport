@@ -3,6 +3,7 @@ from pathlib import Path
 from click.testing import CliRunner
 
 import netimport_lib.cli as cli
+from netimport_lib.visualizer import GraphVisualizer
 
 
 def _write_pyproject_config(project_root: Path, config_body: str) -> None:
@@ -10,6 +11,23 @@ def _write_pyproject_config(project_root: Path, config_body: str) -> None:
         "[project]\nname = 'sample-project'\nversion = '0.1.0'\n"
         f"{config_body}",
         encoding="utf-8",
+    )
+
+
+def _build_recording_visualizer(
+    name: str,
+    supported_layouts: tuple[str, ...],
+    default_layout: str,
+    calls: list[tuple[str, str]],
+) -> GraphVisualizer:
+    def fake_visualizer(_graph, layout: str) -> None:
+        calls.append((name, layout))
+
+    return GraphVisualizer(
+        name=name,
+        render=fake_visualizer,
+        supported_layouts=supported_layouts,
+        default_layout=default_layout,
     )
 
 
@@ -40,7 +58,10 @@ def test_cli_prints_console_summary(monkeypatch, tmp_path: Path) -> None:
     )
 
     runner = CliRunner()
-    result = runner.invoke(cli.main, [str(project_root), "--show-console-summary"])
+    result = runner.invoke(
+        cli.main,
+        [str(project_root), "--show-console-summary", "--no-show-graph"],
+    )
 
     assert result.exit_code == 0
     assert "Dependency Graph Summary" in result.output
@@ -65,12 +86,19 @@ def test_cli_no_show_graph_disables_visualizer(monkeypatch, tmp_path: Path) -> N
         encoding="utf-8",
     )
 
-    visualizer_calls: list[tuple[int, str]] = []
-
-    def fake_visualizer(graph, layout) -> None:
-        visualizer_calls.append((graph.number_of_nodes(), layout))
-
-    monkeypatch.setattr(cli, "GRAPH_VISUALIZERS", {"bokeh": fake_visualizer})
+    visualizer_calls: list[tuple[str, str]] = []
+    monkeypatch.setattr(
+        cli,
+        "GRAPH_VISUALIZERS",
+        {
+            "bokeh": _build_recording_visualizer(
+                "bokeh",
+                ("constrained",),
+                "constrained",
+                visualizer_calls,
+            )
+        },
+    )
     monkeypatch.setattr(
         cli,
         "load_config",
@@ -92,6 +120,178 @@ def test_cli_no_show_graph_disables_visualizer(monkeypatch, tmp_path: Path) -> N
     assert result.exit_code == 0
     assert "Dependency Graph Summary" in result.output
     assert visualizer_calls == []
+
+
+def test_cli_uses_bokeh_default_layout_when_layout_is_omitted(monkeypatch, tmp_path: Path) -> None:
+    project_root = tmp_path / "sample_project"
+    project_root.mkdir()
+
+    (project_root / "main.py").write_text(
+        "import helper\n",
+        encoding="utf-8",
+    )
+    (project_root / "helper.py").write_text("", encoding="utf-8")
+
+    visualizer_calls: list[tuple[str, str]] = []
+    monkeypatch.setattr(
+        cli,
+        "GRAPH_VISUALIZERS",
+        {
+            "bokeh": _build_recording_visualizer(
+                "bokeh",
+                ("constrained",),
+                "constrained",
+                visualizer_calls,
+            ),
+            "mpl": _build_recording_visualizer(
+                "mpl",
+                ("spring", "circular"),
+                "spring",
+                visualizer_calls,
+            ),
+        },
+    )
+    monkeypatch.setattr(
+        cli,
+        "load_config",
+        lambda _project_root: {
+            "ignored_nodes": set(),
+            "ignored_dirs": set(),
+            "ignored_files": set(),
+            "ignore_stdlib": False,
+            "ignore_external_lib": False,
+        },
+    )
+
+    runner = CliRunner()
+    result = runner.invoke(cli.main, [str(project_root)])
+
+    assert result.exit_code == 0
+    assert visualizer_calls == [("bokeh", "constrained")]
+
+
+def test_cli_uses_mpl_default_layout_when_layout_is_omitted(monkeypatch, tmp_path: Path) -> None:
+    project_root = tmp_path / "sample_project"
+    project_root.mkdir()
+
+    (project_root / "main.py").write_text("import helper\n", encoding="utf-8")
+    (project_root / "helper.py").write_text("", encoding="utf-8")
+
+    visualizer_calls: list[tuple[str, str]] = []
+    monkeypatch.setattr(
+        cli,
+        "GRAPH_VISUALIZERS",
+        {
+            "bokeh": _build_recording_visualizer(
+                "bokeh",
+                ("constrained",),
+                "constrained",
+                visualizer_calls,
+            ),
+            "mpl": _build_recording_visualizer(
+                "mpl",
+                ("spring", "circular"),
+                "spring",
+                visualizer_calls,
+            ),
+        },
+    )
+    monkeypatch.setattr(
+        cli,
+        "load_config",
+        lambda _project_root: {
+            "ignored_nodes": set(),
+            "ignored_dirs": set(),
+            "ignored_files": set(),
+            "ignore_stdlib": False,
+            "ignore_external_lib": False,
+        },
+    )
+
+    runner = CliRunner()
+    result = runner.invoke(cli.main, [str(project_root), "--show-graph", "mpl"])
+
+    assert result.exit_code == 0
+    assert visualizer_calls == [("mpl", "spring")]
+
+
+def test_cli_accepts_supported_backend_and_layout_combination(monkeypatch, tmp_path: Path) -> None:
+    project_root = tmp_path / "sample_project"
+    project_root.mkdir()
+
+    (project_root / "main.py").write_text("import helper\n", encoding="utf-8")
+    (project_root / "helper.py").write_text("", encoding="utf-8")
+
+    visualizer_calls: list[tuple[str, str]] = []
+    monkeypatch.setattr(
+        cli,
+        "GRAPH_VISUALIZERS",
+        {
+            "bokeh": _build_recording_visualizer(
+                "bokeh",
+                ("constrained",),
+                "constrained",
+                visualizer_calls,
+            ),
+            "mpl": _build_recording_visualizer(
+                "mpl",
+                ("spring", "circular"),
+                "spring",
+                visualizer_calls,
+            ),
+        },
+    )
+    monkeypatch.setattr(
+        cli,
+        "load_config",
+        lambda _project_root: {
+            "ignored_nodes": set(),
+            "ignored_dirs": set(),
+            "ignored_files": set(),
+            "ignore_stdlib": False,
+            "ignore_external_lib": False,
+        },
+    )
+
+    runner = CliRunner()
+    result = runner.invoke(
+        cli.main,
+        [str(project_root), "--show-graph", "mpl", "--layout", "circular"],
+    )
+
+    assert result.exit_code == 0
+    assert visualizer_calls == [("mpl", "circular")]
+
+
+def test_cli_rejects_unsupported_backend_and_layout_combination(tmp_path: Path) -> None:
+    project_root = tmp_path / "sample_project"
+    project_root.mkdir()
+
+    runner = CliRunner()
+    result = runner.invoke(
+        cli.main,
+        [str(project_root), "--show-graph", "bokeh", "--layout", "spring"],
+    )
+
+    assert result.exit_code != 0
+    assert "Layout 'spring' is not supported by the 'bokeh' backend" in result.output
+    assert "Supported layouts: constrained." in result.output
+
+
+def test_cli_help_lists_only_supported_visualizers_and_layouts() -> None:
+    runner = CliRunner()
+    result = runner.invoke(cli.main, ["--help"])
+
+    assert result.exit_code == 0
+    assert "--show-graph [bokeh|mpl]" in result.output
+    assert "--layout [constrained|spring|circular|shell|planar_layout]" in result.output
+    assert "dot" not in result.output
+    assert "neato" not in result.output
+    assert "fdp" not in result.output
+    assert "sfdp" not in result.output
+    assert "kamada_kawai" not in result.output
+    assert "spectral" not in result.output
+    assert "plotly" not in result.output
 
 
 def test_cli_loads_config_from_target_project(monkeypatch, tmp_path: Path) -> None:

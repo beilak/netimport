@@ -11,7 +11,13 @@ from netimport_lib.graph_builder.graph_builder import (
 from netimport_lib.imports_reader import get_imported_modules_as_strings
 from netimport_lib.project_file_reader import find_python_files
 from netimport_lib.summary_builder import print_summary
-from netimport_lib.visualizer import GRAPH_VISUALIZERS
+from netimport_lib.visualizer import (
+    DEFAULT_VISUALIZER,
+    GRAPH_LAYOUT_CHOICES,
+    GRAPH_VISUALIZER_NAMES,
+    GRAPH_VISUALIZERS,
+    GraphVisualizer,
+)
 
 
 IGNORE_NODES: set = set()
@@ -22,30 +28,19 @@ IGNORE_NODES: set = set()
 @click.option(
     "--layout",
     type=click.Choice(
-        [
-            "planar_layout",
-            "spring",
-            "kamada_kawai",
-            "circular",
-            "spectral",
-            "shell",
-            "dot",
-            "neato",
-            "fdp",
-            "sfdp",
-        ],
+        GRAPH_LAYOUT_CHOICES,
         case_sensitive=False,
     ),
-    default="planar_layout",
-    show_default=True,
+    default=None,
+    help="Layout for the selected graph backend. If omitted, the backend default is used.",
 )
 @click.option(
     "--show-graph",
     type=click.Choice(
-        ["bokeh", "mpl"],
+        GRAPH_VISUALIZER_NAMES,
         case_sensitive=False,
     ),
-    default="bokeh",
+    default=DEFAULT_VISUALIZER,
     show_default=True,
 )
 @click.option(
@@ -106,8 +101,8 @@ IGNORE_NODES: set = set()
 )
 def main(
     project_path: str,
-    layout: str,
-    show_graph: str | None = "bokeh",
+    layout: str | None = None,
+    show_graph: str = DEFAULT_VISUALIZER,
     no_show_graph: bool = False,
     show_console_summary: bool = False,
     ignored_dirs: tuple[str, ...] = (),
@@ -125,6 +120,12 @@ def main(
         ignore_stdlib=ignore_stdlib,
         ignore_external_lib=ignore_external_lib,
     )
+
+    selected_visualizer: GraphVisualizer | None = None
+    selected_layout: str | None = None
+    if not no_show_graph:
+        selected_visualizer = _get_visualizer(show_graph)
+        selected_layout = _resolve_visualizer_layout(selected_visualizer, layout)
 
     file_imports_map: dict[str, list[str]] = {}
 
@@ -157,8 +158,8 @@ def main(
     if nodes_to_remove:
         dependency_graph.remove_nodes_from(nodes_to_remove)
 
-    if not no_show_graph and show_graph and (visualizer := GRAPH_VISUALIZERS.get(show_graph)):
-        visualizer(dependency_graph, layout)
+    if selected_visualizer and selected_layout:
+        selected_visualizer.render(dependency_graph, selected_layout)
 
     if show_console_summary:
         print_summary(dependency_graph)
@@ -191,3 +192,27 @@ def _merge_cli_config(
         merged_config["ignore_external_lib"] = ignore_external_lib
 
     return merged_config
+
+
+def _get_visualizer(name: str) -> GraphVisualizer:
+    try:
+        return GRAPH_VISUALIZERS[name]
+    except KeyError as exc:
+        raise click.ClickException(f"Graph backend '{name}' is not available.") from exc
+
+
+def _resolve_visualizer_layout(visualizer: GraphVisualizer, layout: str | None) -> str:
+    if layout is None:
+        return visualizer.default_layout
+
+    if layout in visualizer.supported_layouts:
+        return layout
+
+    supported_layouts = ", ".join(visualizer.supported_layouts)
+    raise click.BadParameter(
+        (
+            f"Layout '{layout}' is not supported by the '{visualizer.name}' backend. "
+            f"Supported layouts: {supported_layouts}."
+        ),
+        param_hint="--layout",
+    )

@@ -6,7 +6,7 @@ NetImport is a static analysis tool for Python projects that helps developers vi
 
 *   **Import Analysis:** Recursively scans the specified project directory for Python files and parses their `import` statements.
 *   **Dependency Graph Construction:** Creates a directed graph where nodes represent project modules/packages, as well as external and standard libraries. Edges depict the imports between them.
-*   **Graph Visualization:** Integrates with Matplotlib to generate visual representations of the dependency graph, facilitating easier analysis.
+*   **Graph Visualization:** Supports an interactive Bokeh view and a static Matplotlib view with explicit backend/layout compatibility.
 *   **Console Summary:** Prints a deterministic text report with project-level counts and coupling tables.
 *   **Configuration via CLI and TOML files:** Supports CLI overrides plus config from `[tool.netimport]` in `pyproject.toml` or `.netimport.toml`.
 *   **Dependency Type Identification:** Distinguishes imports of internal project modules, Python standard libraries, and external third-party dependencies.
@@ -45,13 +45,20 @@ netimport [OPTIONS] <PROJECT_PATH>
 
 Path to the root directory of the Python project to analyze.
 
-`--layout [planar_layout|spring|kamada_kawai|circular|spectral|shell|dot|neato|fdp|sfdp]`
+`--layout [constrained|spring|circular|shell|planar_layout]`
 
-Choose a layout name for the graph backend.
+Choose a layout name for the selected graph backend. If omitted, NetImport uses the backend default.
 
 `--show-graph [bokeh|mpl]`
 
 Select the visualization backend. Current default is `bokeh`.
+
+Supported backend/layout combinations:
+
+- `bokeh`: `constrained` (default)
+- `mpl`: `spring` (default), `circular`, `shell`, `planar_layout`
+
+Unsupported combinations are rejected with a clear CLI error instead of silently falling back.
 
 `--no-show-graph`
 
@@ -91,22 +98,74 @@ Override whether external libraries should be excluded.
 
 ### Examples
 
-Open the graph for a project using the default backend:
+Below are the supported launch modes with a short explanation of what each mode is for.
+
+Default interactive mode
+
+Use this when you want the standard interactive graph view with folder grouping and node dragging.
 
 ```bash
 poetry run netimport example
 ```
 
-Print only the console summary and do not open the browser:
+This is equivalent to `--show-graph bokeh --layout constrained`.
+
+Explicit Bokeh mode
+
+Use this when you want to call the default interactive mode explicitly in scripts, docs, or manual checks.
+
+```bash
+poetry run netimport example --show-graph bokeh --layout constrained
+```
+
+This opens the Bokeh visualizer with the `constrained` layout.
+
+Matplotlib spring mode
+
+Use this as the most universal static Matplotlib layout. It is the safest choice when you want a readable static graph for general-purpose inspection.
+
+```bash
+poetry run netimport example --show-graph mpl --layout spring
+```
+
+Matplotlib circular mode
+
+Use this when you want a simple ring-like layout that is easy to scan on small or medium graphs.
+
+```bash
+poetry run netimport example --show-graph mpl --layout circular
+```
+
+Matplotlib shell mode
+
+Use this when you want a layered visual structure with nodes arranged in shells.
+
+```bash
+poetry run netimport example --show-graph mpl --layout shell
+```
+
+Matplotlib planar mode
+
+Use this only when a planar-style view is useful for the current graph. For dense or non-planar dependency graphs, this mode may be less practical than `spring`.
+
+```bash
+poetry run netimport example --show-graph mpl --layout planar_layout
+```
+
+Graph plus console summary
+
+Use this when you want both the graph visualization and the textual dependency report in the same run.
+
+```bash
+poetry run netimport example --show-console-summary
+```
+
+Summary-only mode
+
+Use this in CI, SSH sessions, terminals without GUI support, or when you only need the textual report.
 
 ```bash
 poetry run netimport example --show-console-summary --no-show-graph
-```
-
-Use the Matplotlib backend explicitly:
-
-```bash
-poetry run netimport example --show-graph mpl
 ```
 
 Example summary output:

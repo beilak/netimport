@@ -5,7 +5,7 @@ import plotly.graph_objects as go
 FREEZ_RANDOM_SEED = 42
 
 
-def draw_plotly_graph(graph: nx.DiGraph, layout: str) -> None:
+def draw_plotly_graph(graph: nx.DiGraph, _layout: str) -> None:
     pos = nx.spring_layout(graph, k=0.5, iterations=50)
 
     edge_x = []

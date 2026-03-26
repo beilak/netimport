@@ -34,7 +34,7 @@ The core idea is implemented and the basic graph-building flow exists:
 
 What is missing is the product layer around that core:
 
-- config behavior is not trustworthy yet
+- some config-loading gaps have been closed, but overall product hardening is still incomplete
 - some documentation still needs follow-up, but core CLI usage is now documented
 - type checks and lints are not green
 - test coverage is too shallow for a production CLI tool
@@ -65,83 +65,42 @@ Observed results:
 
 ## Problems
 
-### P1. CLI loads config from the wrong place
+## DONE. P1. CLI loads config from the target project
 
-### Why it matters
+### Status
 
-When a user runs `netimport /path/to/other/project`, the tool should use the analyzed project's config. Right now CLI loads config from the current working directory instead.
+Implemented in `netimport_lib/cli.py` and covered by CLI tests.
 
-### Where
+### Done
 
-- `netimport_lib/cli.py`
-
-### Evidence
-
-`main()` calls:
-
-```python
-loaded_config: NetImportConfigMap = load_config(".")
-```
-
-This should likely be based on `project_path`, not `"."`.
-
-### Consequence
-
-- wrong directories/files may be ignored
-- wrong stdlib/external settings may be applied
-- analyzing another repo from outside that repo becomes misleading
-
-### Suggested implementation
-
-1. Load config from the analyzed project root.
-2. Normalize `project_path` early.
-3. Decide and document precedence rules clearly:
-   - CLI arguments
-   - `.netimport.toml`
-   - `[tool.netimport]` in `pyproject.toml`
-   - defaults
-4. Add tests that run analysis from a different working directory than the target project.
+1. Normalized `project_path` early in CLI.
+2. Switched config loading from caller cwd to the analyzed project root.
+3. Documented precedence between defaults, `pyproject.toml`, `.netimport.toml`, and CLI options.
+4. Added a CLI integration test that runs analysis from a different working directory than the target project.
 
 ### Acceptance criteria
 
 - `netimport /tmp/target-project` uses `/tmp/target-project` config, not caller cwd config.
 - Tests cover this exact scenario.
 
-## P1. `.netimport.toml` is promised but not supported
+## DONE. P1. `.netimport.toml` support is implemented
 
-### Why it matters
+### Status
 
-README promises both `.netimport.toml` and `pyproject.toml`, but loader only checks `pyproject.toml`.
+Implemented in `netimport_lib/config_loader.py` and documented in `README.md`.
 
-### Where
+### Done
 
-- `README.md`
-- `netimport_lib/config_loader.py`
-
-### Evidence
-
-`load_config()` only checks:
-
-- `pyproject.toml`
-
-It ignores:
-
-- `.netimport.toml`
-
-### Consequence
-
-- documentation is incorrect
-- users can create a valid-looking config file that has zero effect
-
-### Suggested implementation
-
-1. Add support for `.netimport.toml`.
-2. Define precedence explicitly.
-3. Add tests for:
-   - only `.netimport.toml`
-   - only `pyproject.toml`
-   - both present
-   - malformed config
+1. Added support for `.netimport.toml`.
+2. Defined precedence explicitly:
+   - defaults
+   - `[tool.netimport]` in `pyproject.toml`
+   - `.netimport.toml`
+   - CLI options
+3. Added tests for:
+   - no `[tool.netimport]` section
+   - both config files present
+4. Updated README to match the actual behavior.
 
 ### Acceptance criteria
 
@@ -149,45 +108,22 @@ It ignores:
 - Conflicts are resolved according to documented precedence.
 - README matches behavior exactly.
 
-## P1. `ignored_files` from config is not used by CLI
+## DONE. P1. `ignored_files` from config is used by CLI
 
-### Why it matters
+### Status
 
-Config model supports `ignored_files`, but CLI passes an empty set to file discovery.
+Implemented in `netimport_lib/cli.py` and covered by CLI tests.
 
-### Where
+### Done
 
-- `netimport_lib/cli.py`
-- `netimport_lib/config_loader.py`
-- `netimport_lib/project_file_reader.py`
-
-### Evidence
-
-CLI currently calls:
-
-```python
-find_python_files(
-    project_path,
-    ignored_dirs=loaded_config["ignored_dirs"],
-    ignored_files=set(),
-)
-```
-
-### Consequence
-
-- users cannot actually exclude configured files
-- behavior disagrees with config model and README
-
-### Suggested implementation
-
-1. Pass `loaded_config["ignored_files"]`.
-2. Add CLI override support if desired.
-3. Add tests for ignored file behavior.
+1. Passed `loaded_config["ignored_files"]` into file discovery.
+2. Added CLI override support for ignored files.
+3. Added tests verifying that configured ignored files are excluded from analysis.
 
 ### Acceptance criteria
 
-- a file listed in config is excluded from analysis
-- tests verify that exclusion
+- a file listed in config is excluded from analysis.
+- tests verify that exclusion.
 
 ## DONE. P1. Summary output is implemented
 
@@ -509,10 +445,10 @@ This section is the implementation backlog for another LLM or engineer.
 
 ### Tasks
 
-1. Normalize and validate `project_path` at CLI entry.
-2. Load config from target project.
-3. Add `.netimport.toml` support.
-4. Apply `ignored_files`.
+1. DONE. Normalize and validate `project_path` at CLI entry.
+2. DONE. Load config from target project.
+3. DONE. Add `.netimport.toml` support.
+4. DONE. Apply `ignored_files`.
 5. Add `--config` support if the README contract should be preserved.
 6. Decide whether `--show-console-summary` should default to `False` instead of `True`.
 7. Add `__main__` support if desired.

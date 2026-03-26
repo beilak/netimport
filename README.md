@@ -8,7 +8,7 @@ NetImport is a static analysis tool for Python projects that helps developers vi
 *   **Dependency Graph Construction:** Creates a directed graph where nodes represent project modules/packages, as well as external and standard libraries. Edges depict the imports between them.
 *   **Graph Visualization:** Integrates with Matplotlib to generate visual representations of the dependency graph, facilitating easier analysis.
 *   **Console Summary:** Prints a deterministic text report with project-level counts and coupling tables.
-*   **Configuration via `pyproject.toml`:** Supports `[tool.netimport]` settings for ignored directories, ignored files, stdlib filtering, external library filtering, and ignored nodes.
+*   **Configuration via CLI and TOML files:** Supports CLI overrides plus config from `[tool.netimport]` in `pyproject.toml` or `.netimport.toml`.
 *   **Dependency Type Identification:** Distinguishes imports of internal project modules, Python standard libraries, and external third-party dependencies.
 
 ## Why Use NetImport?
@@ -69,6 +69,26 @@ Print a textual dependency report with tables for:
 - external dependencies
 - unresolved imports
 
+`--ignored-dir TEXT`
+
+Ignore a directory name during project file discovery. Can be passed multiple times.
+
+`--ignored-file TEXT`
+
+Ignore a file name during project file discovery. Can be passed multiple times.
+
+`--ignored-node TEXT`
+
+Ignore a graph node by label or id. Can be passed multiple times.
+
+`--ignore-stdlib` / `--include-stdlib`
+
+Override whether standard library modules should be excluded.
+
+`--ignore-external-lib` / `--include-external-lib`
+
+Override whether external libraries should be excluded.
+
 ### Examples
 
 Open the graph for a project using the default backend:
@@ -120,7 +140,21 @@ Project Coupling Metrics
 
 ### Configuration
 
-Current implementation reads configuration from the `[tool.netimport]` section in `pyproject.toml` in the current working directory.
+NetImport reads configuration from the analyzed project directory, not from the caller's current working directory.
+
+Supported config files:
+
+- `[tool.netimport]` in `pyproject.toml`
+- `.netimport.toml`
+
+Precedence:
+
+1. built-in defaults
+2. `pyproject.toml`
+3. `.netimport.toml`
+4. CLI options
+
+For collection options (`ignored_dirs`, `ignored_files`, `ignored_nodes`), CLI values are added on top of file config values. For boolean options (`ignore_stdlib`, `ignore_external_lib`), explicit CLI flags override file config values.
 
 Supported keys:
 
@@ -130,7 +164,7 @@ Supported keys:
 - `ignore_external_lib`
 - `ignored_nodes`
 
-Example:
+`pyproject.toml` example:
 
 ```
 [tool.netimport]
@@ -138,6 +172,16 @@ ignored_dirs = ["venv", ".venv", "tests", "docs", "__pycache__", "node_modules",
 ignored_files = ["setup.py", "manage.py"]
 ignore_stdlib = true
 ignore_external_lib = true
+ignored_nodes = []
+```
+
+`.netimport.toml` example:
+
+```toml
+ignored_dirs = ["venv", ".venv"]
+ignored_files = ["setup.py"]
+ignore_stdlib = false
+ignore_external_lib = false
 ignored_nodes = []
 ```
 

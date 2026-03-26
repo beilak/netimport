@@ -238,11 +238,14 @@ Implemented.
 
 ### Status
 
-Partially improved. Core CLI/config/summary coverage exists, and resolver edge-case coverage has been added in:
+Partially improved. Core CLI/config/summary coverage exists, resolver edge-case
+coverage has been added, and visualizer/headless coverage now exists in:
 
 - `tests/test_resolver_imports.py`
 - `tests/test_graph_builder.py`
 - `tests/test_imports_reader.py`
+- `tests/test_bokeh_plotter.py`
+- `tests/test_mpl_plotter.py`
 
 ### Why it matters
 
@@ -268,11 +271,12 @@ Coverage added since the original audit:
 - stdlib vs external import classification
 - relative import edge cases
 - type-checking import filtering
+- visualizer render-preparation behavior
+- headless visualizer smoke coverage
 
 Remaining gaps include:
 
-- visualizer behavior
-- headless environments
+- weak demo tests outside the strict release gate
 
 Also, demo tests are weak:
 
@@ -292,7 +296,7 @@ Add tests in layers:
 2. DONE. Unit tests for import resolution edge cases.
 3. DONE. Snapshot-like tests for summary output.
 4. DONE. CLI integration tests using `click.testing.CliRunner`.
-5. Optional smoke tests for visualizer adapters.
+5. DONE. Optional smoke tests for visualizer adapters.
 
 ### Acceptance criteria
 
@@ -616,14 +620,14 @@ Implemented in:
 - Preserve deterministic outputs.
 - Be explicit about known unsupported cases instead of silently guessing.
 
-## Workstream 4. Fix visualizer boundaries
+## DONE. Workstream 4. Fix visualizer boundaries
 
 ### Status
 
-Partially implemented. Supported backends/layouts are explicit, unsupported
-combinations fail clearly, and the hidden Plotly backend path has been removed
-from both the shipped code and package dependencies. Remaining follow-up is
-separating graph generation from side-effectful rendering.
+Implemented. Supported backends/layouts are explicit, unsupported combinations
+fail clearly, the hidden Plotly backend path has been removed from both the
+shipped code and package dependencies, and graph preparation is now separated
+from side-effectful rendering.
 
 ### Tasks
 
@@ -631,7 +635,7 @@ separating graph generation from side-effectful rendering.
 2. DONE. Decide supported layouts per backend.
 3. DONE. Remove or implement dead/hidden code paths.
 4. DONE. Make unsupported layout/backend combinations fail clearly.
-5. Consider separating graph generation from side-effectful rendering.
+5. DONE. Separate graph generation from side-effectful rendering.
 
 ### Files likely to change
 
@@ -682,9 +686,10 @@ Implemented in:
 ### Status
 
 Partially implemented. Core product behavior is now covered for config loading,
-CLI behavior, summary output, resolver edge cases, and strict typing. Demo tests
-are intentionally outside the strict release gate, but visualizer behavior in
-headless environments still needs deeper coverage.
+CLI behavior, summary output, resolver edge cases, strict typing, and
+visualizer behavior in headless environments. Demo tests are intentionally
+outside the strict release gate; remaining follow-up is reviewing or removing
+weak demo tests.
 
 ### Tasks
 
@@ -692,7 +697,8 @@ headless environments still needs deeper coverage.
 2. DONE. Add CLI integration tests.
 3. DONE. Add summary tests.
 4. DONE. Add resolver edge-case tests.
-5. Review or remove weak demo tests.
+5. DONE. Add visualizer behavior tests for headless environments.
+6. Review or remove weak demo tests.
 
 ### Files likely to change
 

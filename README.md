@@ -1,6 +1,8 @@
 # NetImport: Python Project Architecture Analyzer via Import Graphs
 
-NetImport is a static analysis tool for Python projects that helps developers visualize and evaluate their codebase architecture by analyzing `import` statements. It builds a dependency graph between modules and packages, providing a clearer understanding of the project's structure, identifying potential issues with coupling and cohesion, and tracking complex or undesirable relationships.
+NetImport is a static analysis CLI for Python projects. It scans source files, parses `import` statements, resolves those imports into project, standard-library, external, or unresolved dependencies, and then presents the result as either a dependency graph or a deterministic console summary.
+
+It is intended for architecture inspection, refactoring support, and CI-friendly dependency review. The current release is positioned as a beta-stage developer tool: the core workflows are implemented and tested, while known static-analysis limitations are documented explicitly.
 
 ## Core Features
 
@@ -18,6 +20,15 @@ NetImport is a static analysis tool for Python projects that helps developers vi
 *   **Gauge Cohesion (Indirectly):** While directly calculating cohesion from imports alone is difficult, the graph can provide insights into how logically grouped functionalities are within a module by observing its dependencies.
 *   **Aid Refactoring:** Use the graph as a map during refactoring to understand which parts of the system will be affected by changes.
 *   **Architectural Oversight:** Helps in maintaining a clean and understandable architecture by making dependencies explicit.
+
+## Current Support Contract
+
+NetImport currently supports:
+
+*   Static analysis of Python source trees based on AST-parsed `import` statements.
+*   Deterministic console summaries for headless runs and CI-oriented inspection.
+*   Explicit visualizer backend/layout combinations documented in the CLI and README.
+*   Configuration from `[tool.netimport]` in `pyproject.toml`, `.netimport.toml`, and CLI overrides.
 
 ## Installation
 
@@ -75,6 +86,13 @@ Print a textual dependency report with tables for:
 - most dependent project files
 - external dependencies
 - unresolved imports
+
+`--summary-format [text|json]`
+
+Choose the output format for `--show-console-summary`.
+
+- `text` keeps the current human-readable table output
+- `json` emits a deterministic machine-readable report for CI and automation
 
 `--ignored-dir TEXT`
 
@@ -168,6 +186,14 @@ Use this in CI, SSH sessions, terminals without GUI support, or when you only ne
 poetry run netimport example --show-console-summary --no-show-graph
 ```
 
+JSON summary mode
+
+Use this in CI or scripts when you want a stable machine-readable dependency report.
+
+```bash
+poetry run netimport example --show-console-summary --summary-format json --no-show-graph
+```
+
 Example summary output:
 
 ```text
@@ -244,8 +270,18 @@ ignore_external_lib = false
 ignored_nodes = []
 ```
 
+## Current Limitations
+
+NetImport is intentionally conservative about unsupported cases. Today that means:
+
+*   It is a static analyzer, so runtime imports, plugin loading, and `sys.path` mutations are not modeled.
+*   Namespace packages are not part of the supported resolver contract.
+*   `from ... import *` is handled conservatively and may remain partial when exports are dynamic.
+*   Visualization support is limited to the documented backend/layout combinations instead of silently guessing unsupported modes.
 
 ## Roadmap
+
+The items below are future enhancements, not part of the current support contract.
 
 - Architectural Metrics Calculation:
     - Count of incoming/outgoing dependencies for each module (Afferent/Efferent Couplings).
@@ -276,8 +312,6 @@ Key areas for contribution:
 
 Feel free to open Issues to discuss new ideas or problems.
 
-License
+## License
 
-This project is licensed under the MIT License (you'll need to create this file).
-
-Crafted with ❤️ to help improve Python project architectures.
+This project is licensed under the MIT License. See `LICENSE.txt` for the full text.

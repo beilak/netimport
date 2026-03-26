@@ -1,3 +1,4 @@
+import json
 from pathlib import Path
 from typing import Final
 
@@ -74,6 +75,58 @@ def test_cli_prints_console_summary(monkeypatch: MonkeyPatch, tmp_path: Path) ->
     assert "| Unresolved imports       | 1     |" in result.output
     assert "| 1    | main.py   | 0        | 3        | 3     |" in result.output
     assert "| 1    | .missing.item | unresolved_relative |" in result.output
+
+
+def test_cli_prints_json_summary(monkeypatch: MonkeyPatch, tmp_path: Path) -> None:
+    project_root = tmp_path / "sample_project"
+    project_root.mkdir()
+
+    (project_root / "main.py").write_text(
+        "import helper\nimport os\nimport requests\n",
+        encoding="utf-8",
+    )
+    (project_root / "helper.py").write_text(
+        "from .missing import item\n",
+        encoding="utf-8",
+    )
+
+    monkeypatch.setattr(cli, "GRAPH_VISUALIZERS", {})
+    monkeypatch.setattr(cli, "load_config", _default_loaded_config)
+
+    runner: Final[CliRunner] = CliRunner()
+    result = runner.invoke(
+        cli.main,
+        [
+            str(project_root),
+            "--show-console-summary",
+            "--summary-format",
+            "json",
+            "--no-show-graph",
+        ],
+    )
+
+    assert result.exit_code == 0
+    payload = json.loads(result.output)
+    assert payload["schema_version"] == 1
+    assert payload["overview"] == {
+        "nodes": 5,
+        "edges": 4,
+        "project_files": 2,
+        "standard_library_modules": 1,
+        "external_libraries": 1,
+        "unresolved_imports": 1,
+    }
+    assert payload["most_coupled_project_files"][0] == {
+        "rank": 1,
+        "file": "main.py",
+        "incoming": 0,
+        "outgoing": 3,
+        "total": 3,
+    }
+    assert payload["external_dependencies"] == ["requests"]
+    assert payload["unresolved_imports"] == [
+        {"rank": 1, "import_name": ".missing.item", "type": "unresolved_relative"}
+    ]
 
 
 def test_cli_no_show_graph_disables_visualizer(monkeypatch: MonkeyPatch, tmp_path: Path) -> None:
@@ -248,6 +301,7 @@ def test_cli_help_lists_only_supported_visualizers_and_layouts() -> None:
     assert result.exit_code == 0
     assert "--show-graph [bokeh|mpl]" in result.output
     assert "--layout [constrained|spring|circular|shell|planar_layout]" in result.output
+    assert "--summary-format [text|json]" in result.output
     assert "dot" not in result.output
     assert "neato" not in result.output
     assert "fdp" not in result.output

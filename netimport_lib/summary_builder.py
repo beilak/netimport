@@ -1,8 +1,9 @@
 """Console summary formatting for dependency graphs."""
 
+import json
 import os
 from collections.abc import Iterable, Mapping, Sequence
-from dataclasses import dataclass
+from dataclasses import asdict, dataclass
 from pathlib import Path
 from statistics import mean, median
 from typing import Final, cast
@@ -33,10 +34,70 @@ class _SimpleNodeSummary:
     node_type: str
 
 
+@dataclass(frozen=True, slots=True)
+class _DegreeMetricSummary:
+    avg: float
+    median: float
+    min: int
+    max: int
+
+
+@dataclass(frozen=True, slots=True)
+class _OverviewSummary:
+    nodes: int
+    edges: int
+    project_files: int
+    standard_library_modules: int
+    external_libraries: int
+    unresolved_imports: int
+
+
+@dataclass(frozen=True, slots=True)
+class _ProjectMetricsSummary:
+    project_files_analyzed: int
+    incoming_degree: _DegreeMetricSummary
+    outgoing_degree: _DegreeMetricSummary
+    total_degree: _DegreeMetricSummary
+
+
+@dataclass(frozen=True, slots=True)
+class _RankedProjectFileSummary:
+    rank: int
+    file: str
+    incoming: int
+    outgoing: int
+    total: int
+
+
+@dataclass(frozen=True, slots=True)
+class _UnresolvedImportSummary:
+    rank: int
+    import_name: str
+    type: str
+
+
+@dataclass(frozen=True, slots=True)
+class _DependencySummaryPayload:
+    schema_version: int
+    overview: _OverviewSummary
+    project_metrics: _ProjectMetricsSummary
+    most_coupled_project_files: list[_RankedProjectFileSummary]
+    least_coupled_project_files: list[_RankedProjectFileSummary]
+    most_depended_on_project_files: list[_RankedProjectFileSummary]
+    most_dependent_project_files: list[_RankedProjectFileSummary]
+    external_dependencies: list[str]
+    unresolved_imports: list[_UnresolvedImportSummary]
+
+
 def print_summary(graph: nx.DiGraph) -> None:
     """Print a formatted dependency summary for a graph."""
     for line in format_summary(graph):
         click.echo(line)
+
+
+def print_json_summary(graph: nx.DiGraph) -> None:
+    """Print a machine-readable dependency summary for a graph."""
+    click.echo(format_summary_json(graph))
 
 
 def format_summary(graph: nx.DiGraph) -> list[str]:
@@ -121,21 +182,130 @@ def format_summary(graph: nx.DiGraph) -> list[str]:
     return lines
 
 
+def build_summary_payload(graph: nx.DiGraph) -> dict[str, object]:
+    """Build a deterministic structured summary for a dependency graph."""
+    project_entries = _build_project_entries(graph)
+    external_entries = _build_external_entries(graph)
+    unresolved_entries = _build_unresolved_entries(graph)
+
+    payload = _DependencySummaryPayload(
+        schema_version=1,
+        overview=_build_overview_summary(graph),
+        project_metrics=_build_project_metrics_summary(project_entries),
+        most_coupled_project_files=_build_ranked_project_files(
+            sorted(
+                project_entries,
+                key=lambda entry: (
+                    -entry.total,
+                    -entry.incoming,
+                    -entry.outgoing,
+                    entry.display_name,
+                ),
+            )
+        ),
+        least_coupled_project_files=_build_ranked_project_files(
+            sorted(
+                project_entries,
+                key=lambda entry: (
+                    entry.total,
+                    entry.incoming,
+                    entry.outgoing,
+                    entry.display_name,
+                ),
+            )
+        ),
+        most_depended_on_project_files=_build_ranked_project_files(
+            sorted(
+                project_entries,
+                key=lambda entry: (
+                    -entry.incoming,
+                    -entry.total,
+                    -entry.outgoing,
+                    entry.display_name,
+                ),
+            )
+        ),
+        most_dependent_project_files=_build_ranked_project_files(
+            sorted(
+                project_entries,
+                key=lambda entry: (
+                    -entry.outgoing,
+                    -entry.total,
+                    -entry.incoming,
+                    entry.display_name,
+                ),
+            )
+        ),
+        external_dependencies=[entry.display_name for entry in external_entries],
+        unresolved_imports=[
+            _UnresolvedImportSummary(
+                rank=index,
+                import_name=entry.display_name,
+                type=entry.node_type,
+            )
+            for index, entry in enumerate(unresolved_entries, start=1)
+        ],
+    )
+
+    return cast("dict[str, object]", asdict(payload))
+
+
+def format_summary_json(graph: nx.DiGraph) -> str:
+    """Serialize a deterministic JSON dependency summary for a graph."""
+    return json.dumps(build_summary_payload(graph), indent=2)
+
+
 def _build_section(title: str, body_lines: Sequence[str]) -> list[str]:
     return [title, "=" * len(title), *body_lines]
 
 
+def _build_overview_summary(graph: nx.DiGraph) -> _OverviewSummary:
+    return _OverviewSummary(
+        nodes=graph.number_of_nodes(),
+        edges=graph.number_of_edges(),
+        project_files=_count_nodes_by_type(graph, PROJECT_FILE_NODE_TYPE),
+        standard_library_modules=_count_nodes_by_type(graph, "std_lib"),
+        external_libraries=_count_nodes_by_type(graph, EXTERNAL_LIB_NODE_TYPE),
+        unresolved_imports=_count_unresolved_nodes(graph),
+    )
+
+
 def _format_overview(graph: nx.DiGraph) -> list[str]:
+    overview = _build_overview_summary(graph)
     return _format_table(
         ("Metric", "Value"),
         [
-            ("Nodes", str(graph.number_of_nodes())),
-            ("Edges", str(graph.number_of_edges())),
-            ("Project files", str(_count_nodes_by_type(graph, PROJECT_FILE_NODE_TYPE))),
-            ("Standard library modules", str(_count_nodes_by_type(graph, "std_lib"))),
-            ("External libraries", str(_count_nodes_by_type(graph, EXTERNAL_LIB_NODE_TYPE))),
-            ("Unresolved imports", str(_count_unresolved_nodes(graph))),
+            ("Nodes", str(overview.nodes)),
+            ("Edges", str(overview.edges)),
+            ("Project files", str(overview.project_files)),
+            ("Standard library modules", str(overview.standard_library_modules)),
+            ("External libraries", str(overview.external_libraries)),
+            ("Unresolved imports", str(overview.unresolved_imports)),
         ],
+    )
+
+
+def _build_project_metrics_summary(
+    project_entries: Sequence[_ProjectNodeSummary],
+) -> _ProjectMetricsSummary:
+    if not project_entries:
+        zero_metrics = _DegreeMetricSummary(avg=0.0, median=0.0, min=0, max=0)
+        return _ProjectMetricsSummary(
+            project_files_analyzed=0,
+            incoming_degree=zero_metrics,
+            outgoing_degree=zero_metrics,
+            total_degree=zero_metrics,
+        )
+
+    incoming_values = [entry.incoming for entry in project_entries]
+    outgoing_values = [entry.outgoing for entry in project_entries]
+    total_values = [entry.total for entry in project_entries]
+
+    return _ProjectMetricsSummary(
+        project_files_analyzed=len(project_entries),
+        incoming_degree=_build_degree_metric_summary(incoming_values),
+        outgoing_degree=_build_degree_metric_summary(outgoing_values),
+        total_degree=_build_degree_metric_summary(total_values),
     )
 
 
@@ -146,28 +316,38 @@ def _format_project_metrics(project_entries: Sequence[_ProjectNodeSummary]) -> l
             [("Project files analyzed", "0", "0", "0", "0")],
         )
 
-    incoming_values = [entry.incoming for entry in project_entries]
-    outgoing_values = [entry.outgoing for entry in project_entries]
-    total_values = [entry.total for entry in project_entries]
+    metrics = _build_project_metrics_summary(project_entries)
 
     return _format_table(
         ("Metric", "Avg", "Median", "Min", "Max"),
         [
-            ("Project files analyzed", str(len(project_entries)), "-", "-", "-"),
-            _build_metric_row("Incoming degree", incoming_values),
-            _build_metric_row("Outgoing degree", outgoing_values),
-            _build_metric_row("Total degree", total_values),
+            ("Project files analyzed", str(metrics.project_files_analyzed), "-", "-", "-"),
+            _build_metric_row("Incoming degree", metrics.incoming_degree),
+            _build_metric_row("Outgoing degree", metrics.outgoing_degree),
+            _build_metric_row("Total degree", metrics.total_degree),
         ],
     )
 
 
-def _build_metric_row(metric_name: str, values: Sequence[int]) -> tuple[str, str, str, str, str]:
+def _build_degree_metric_summary(values: Sequence[int]) -> _DegreeMetricSummary:
+    return _DegreeMetricSummary(
+        avg=mean(values),
+        median=median(values),
+        min=min(values),
+        max=max(values),
+    )
+
+
+def _build_metric_row(
+    metric_name: str,
+    values: _DegreeMetricSummary,
+) -> tuple[str, str, str, str, str]:
     return (
         metric_name,
-        f"{mean(values):.2f}",
-        f"{median(values):.2f}",
-        str(min(values)),
-        str(max(values)),
+        f"{values.avg:.2f}",
+        f"{values.median:.2f}",
+        str(values.min),
+        str(values.max),
     )
 
 
@@ -250,6 +430,21 @@ def _format_project_ranking(project_entries: Sequence[_ProjectNodeSummary]) -> l
             for index, entry in enumerate(project_entries[:TOP_ITEMS_LIMIT], start=1)
         ],
     )
+
+
+def _build_ranked_project_files(
+    project_entries: Sequence[_ProjectNodeSummary],
+) -> list[_RankedProjectFileSummary]:
+    return [
+        _RankedProjectFileSummary(
+            rank=index,
+            file=entry.display_name,
+            incoming=entry.incoming,
+            outgoing=entry.outgoing,
+            total=entry.total,
+        )
+        for index, entry in enumerate(project_entries[:TOP_ITEMS_LIMIT], start=1)
+    ]
 
 
 def _build_external_entries(graph: nx.DiGraph) -> list[_SimpleNodeSummary]:

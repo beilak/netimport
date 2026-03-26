@@ -1,7 +1,7 @@
 [project]
 name = "netimport"
 version = "0.0.7"
-description = "NetImport: Python Project Architecture Analyzer via Import Graphs"
+description = "Static analysis CLI for Python import graphs and dependency summaries"
 authors = [
     { name = "Beilak Aliev", email = "beilak.aliev@gmail.com" },
 ]
@@ -42,9 +42,8 @@ build-backend = "poetry.core.masonry.api"
 
 [tool.poetry]
 classifiers = [
-    "Development Status :: 3 - Alpha",
+    "Development Status :: 4 - Beta",
     "Intended Audience :: Developers",
-    "License :: OSI Approved :: MIT License",
     "Operating System :: OS Independent",
     "Programming Language :: Python :: 3",
     "Programming Language :: Python :: 3.10",

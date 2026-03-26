@@ -492,11 +492,25 @@ Implemented with strategy 2:
 
 - repo quality gates reflect actual maintenance intent for demo folders
 
-## P3. Product positioning and metadata still say "alpha"
+## DONE. P3. Product positioning and metadata no longer say "alpha"
+
+### Status
+
+Implemented in `pyproject.toml`, `README.md`, `example/tests/test_account.py`,
+and `example/tests/test_user.py`.
+
+### Done
+
+1. Updated packaging metadata from alpha to beta to match the current product maturity.
+2. Tightened the package description so it describes the shipped CLI behavior directly.
+3. Rewrote the README introduction and support contract so it reads like a maintained tool instead of a draft.
+4. Added an explicit `Current Limitations` section documenting the supported static-analysis boundaries.
+5. Cleaned the README license section so it matches the repository contents.
+6. Replaced weak demo tests with small behavior assertions for the example domain models.
 
 ### Why it matters
 
-Metadata and documentation still communicate an unfinished state.
+Metadata and documentation should communicate the real maturity of the tool.
 
 ### Where
 
@@ -505,16 +519,12 @@ Metadata and documentation still communicate an unfinished state.
 
 ### Evidence
 
-- classifier includes `Development Status :: 3 - Alpha`
-- README contains placeholder wording like `Default values. (Maybe. I'm still thinking.)`
+- `pyproject.toml` now uses `Development Status :: 4 - Beta`
+- README documents current support boundaries and limitations explicitly
 
 ### Suggested implementation
 
-After functional gaps are closed:
-
-1. update maturity classifier
-2. clean README wording
-3. make docs task-oriented and precise
+Implemented.
 
 ### Acceptance criteria
 
@@ -681,15 +691,14 @@ Implemented in:
 - Do not weaken checks blindly.
 - If a rule is too strict for the project, document why before relaxing it.
 
-## Workstream 6. Expand tests to real product behavior
+## DONE. Workstream 6. Expand tests to real product behavior
 
 ### Status
 
-Partially implemented. Core product behavior is now covered for config loading,
-CLI behavior, summary output, resolver edge cases, strict typing, and
-visualizer behavior in headless environments. Demo tests are intentionally
-outside the strict release gate; remaining follow-up is reviewing or removing
-weak demo tests.
+Implemented. Core product behavior is covered for config loading, CLI behavior,
+summary output, resolver edge cases, strict typing, and visualizer behavior in
+headless environments. Weak demo tests have been reviewed and replaced with
+small behavior assertions.
 
 ### Tasks
 
@@ -698,7 +707,7 @@ weak demo tests.
 3. DONE. Add summary tests.
 4. DONE. Add resolver edge-case tests.
 5. DONE. Add visualizer behavior tests for headless environments.
-6. Review or remove weak demo tests.
+6. DONE. Review or remove weak demo tests.
 
 ### Files likely to change
 
@@ -774,10 +783,10 @@ Most of those hardening items are now fixed. The project has materially improved
 - the demo-folder policy is explicit
 - product-facing tests are significantly stronger
 
-The main remaining gap is no longer core implementation hygiene, but product
-positioning and release confidence:
+Product-positioning gaps from the original audit have now been addressed:
 
-- metadata still says alpha
+- metadata no longer says alpha
+- README reads like a maintained beta-stage tool and documents its boundaries
 - docs can still be tightened further
 - visualizer/headless coverage is still thinner than the rest of the product
 

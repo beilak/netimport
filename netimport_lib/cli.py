@@ -10,7 +10,7 @@ from netimport_lib.config_loader import NetImportConfigMap, load_config
 from netimport_lib.graph_builder.graph_builder import IgnoreConfigNode, build_dependency_graph
 from netimport_lib.imports_reader import get_imported_modules_as_strings
 from netimport_lib.project_file_reader import find_python_files
-from netimport_lib.summary_builder import print_summary
+from netimport_lib.summary_builder import print_json_summary, print_summary
 from netimport_lib.visualizer import (
     DEFAULT_VISUALIZER,
     GRAPH_LAYOUT_CHOICES,
@@ -54,6 +54,13 @@ class _CliOverrides:
     is_flag=True,
     default=False,
     help="Show a summary of the project dependencies in the console.",
+)
+@click.option(
+    "--summary-format",
+    type=click.Choice(("text", "json"), case_sensitive=False),
+    default="text",
+    show_default=True,
+    help="Output format for --show-console-summary.",
 )
 @click.option(
     "--ignored-dir",
@@ -105,6 +112,7 @@ def main(  # noqa: PLR0913
     show_graph: str = DEFAULT_VISUALIZER,
     no_show_graph: bool = False,
     show_console_summary: bool = False,
+    summary_format: str = "text",
     ignored_dirs: tuple[str, ...] = (),
     ignored_files: tuple[str, ...] = (),
     ignored_nodes: tuple[str, ...] = (),
@@ -154,7 +162,10 @@ def main(  # noqa: PLR0913
         selected_visualizer.render(dependency_graph, selected_layout)
 
     if show_console_summary:
-        print_summary(dependency_graph)
+        if summary_format == "json":
+            print_json_summary(dependency_graph)
+        else:
+            print_summary(dependency_graph)
 
 
 def _remove_isolated_init_nodes(dependency_graph: nx.DiGraph) -> None:

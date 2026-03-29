@@ -232,8 +232,12 @@ poetry run netimport example --config ci/netimport.toml --show-console-summary -
 Example summary output:
 
 ```text
+(This report summarizes the project's import graph so a reader can spot hotspots, risky dependencies, isolated files, and missing links.)
+(Incoming degree shows how many project files depend on a file; outgoing degree shows how many dependencies a file pulls in. Higher values usually mean higher impact or complexity.)
+
 Dependency Graph Summary
 ========================
+(High-level graph totals. Use this table to quickly size the project and see how much of the graph is project code, stdlib, external libraries, or unresolved imports.)
 +--------------------------+-------+
 | Metric                   | Value |
 +--------------------------+-------+
@@ -247,6 +251,7 @@ Dependency Graph Summary
 
 Project Coupling Metrics
 ========================
+(Aggregate coupling across all project files. Avg and Median describe a typical file, while Min and Max highlight the spread and the biggest extremes.)
 +------------------------+------+--------+-----+-----+
 | Metric                 | Avg  | Median | Min | Max |
 +------------------------+------+--------+-----+-----+

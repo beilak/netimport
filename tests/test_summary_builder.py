@@ -17,8 +17,24 @@ def test_format_summary_includes_numeric_coupling_metrics() -> None:
     graph = _build_demo_graph()
 
     assert format_summary(graph) == [
+        (
+            "(This report summarizes the project's import graph so a reader or "
+            "LLM can spot hotspots, risky dependencies, isolated files, and "
+            "missing links.)"
+        ),
+        (
+            "(Incoming degree shows how many project files depend on a file; "
+            "outgoing degree shows how many dependencies a file pulls in. "
+            "Higher values usually mean higher impact or complexity.)"
+        ),
+        "",
         "Dependency Graph Summary",
         "========================",
+        (
+            "(High-level graph totals. Use this table to quickly size the "
+            "project and see how much of the graph is project code, stdlib, "
+            "external libraries, or unresolved imports.)"
+        ),
         "+--------------------------+-------+",
         "| Metric                   | Value |",
         "+--------------------------+-------+",
@@ -32,6 +48,11 @@ def test_format_summary_includes_numeric_coupling_metrics() -> None:
         "",
         "Project Coupling Metrics",
         "========================",
+        (
+            "(Aggregate coupling across all project files. Avg and Median "
+            "describe a typical file, while Min and Max highlight the spread "
+            "and the biggest extremes.)"
+        ),
         "+------------------------+------+--------+-----+-----+",
         "| Metric                 | Avg  | Median | Min | Max |",
         "+------------------------+------+--------+-----+-----+",
@@ -43,6 +64,11 @@ def test_format_summary_includes_numeric_coupling_metrics() -> None:
         "",
         "Most Coupled Project Files",
         "==========================",
+        (
+            "(Files with the highest total degree. Higher totals mean a file "
+            "is highly connected overall, so changes here are more likely to "
+            "ripple across the project.)"
+        ),
         "+------+-------------+----------+----------+-------+",
         "| Rank | File        | Incoming | Outgoing | Total |",
         "+------+-------------+----------+----------+-------+",
@@ -54,6 +80,11 @@ def test_format_summary_includes_numeric_coupling_metrics() -> None:
         "",
         "Least Coupled Project Files",
         "===========================",
+        (
+            "(Files with the lowest total degree. Very low values can indicate "
+            "isolated utilities, unfinished integration, or code paths that "
+            "deserve a second look.)"
+        ),
         "+------+-------------+----------+----------+-------+",
         "| Rank | File        | Incoming | Outgoing | Total |",
         "+------+-------------+----------+----------+-------+",
@@ -65,6 +96,11 @@ def test_format_summary_includes_numeric_coupling_metrics() -> None:
         "",
         "Most Depended-On Project Files",
         "==============================",
+        (
+            "(Files with the highest incoming degree. These are reuse hubs: "
+            "the more incoming links a file has, the more carefully it should "
+            "usually be changed.)"
+        ),
         "+------+-------------+----------+----------+-------+",
         "| Rank | File        | Incoming | Outgoing | Total |",
         "+------+-------------+----------+----------+-------+",
@@ -76,6 +112,11 @@ def test_format_summary_includes_numeric_coupling_metrics() -> None:
         "",
         "Most Dependent Project Files",
         "============================",
+        (
+            "(Files with the highest outgoing degree. High outgoing values "
+            "often point to orchestration code, complex workflows, or modules "
+            "with many responsibilities.)"
+        ),
         "+------+-------------+----------+----------+-------+",
         "| Rank | File        | Incoming | Outgoing | Total |",
         "+------+-------------+----------+----------+-------+",
@@ -87,6 +128,11 @@ def test_format_summary_includes_numeric_coupling_metrics() -> None:
         "",
         "External Dependencies",
         "=====================",
+        (
+            "(Third-party libraries imported by the project. Review this list "
+            "for dependency sprawl, standardization opportunities, and policy "
+            "or supply-chain checks.)"
+        ),
         "+------+------------+",
         "| Rank | Dependency |",
         "+------+------------+",
@@ -95,6 +141,11 @@ def test_format_summary_includes_numeric_coupling_metrics() -> None:
         "",
         "Unresolved Imports",
         "==================",
+        (
+            "(Imports NetImport could not resolve. These often point to broken "
+            "imports, missing files, excluded paths, or dynamic import "
+            "patterns.)"
+        ),
         "+------+----------+---------------------+",
         "| Rank | Import   | Type                |",
         "+------+----------+---------------------+",
@@ -103,6 +154,11 @@ def test_format_summary_includes_numeric_coupling_metrics() -> None:
         "",
         "Policy Violations",
         "=================",
+        (
+            "(Configured rule violations found during analysis. A non-empty "
+            "table means the graph is valid to inspect, but not fully "
+            "compliant with the active policy.)"
+        ),
         "+------+---------+",
         "| Rule | Message |",
         "+------+---------+",
@@ -119,6 +175,7 @@ def test_print_summary_writes_formatted_lines(capsys: CaptureFixture[str]) -> No
     captured = capsys.readouterr()
 
     assert "Dependency Graph Summary" in captured.out
+    assert "This report summarizes the project's import graph" in captured.out
     assert "| Total degree           | 2.25 | 2.50   | 0   | 4   |" in captured.out
     assert "| 1    | main.py     | 0        | 4        | 4     |" in captured.out
 

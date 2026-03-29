@@ -75,6 +75,8 @@ def test_cli_prints_console_summary(monkeypatch: MonkeyPatch, tmp_path: Path) ->
 
     assert result.exit_code == 0
     assert "Dependency Graph Summary" in result.output
+    assert "This report summarizes the project's import graph" in result.output
+    assert "High-level graph totals." in result.output
     assert "| Project files            | 2     |" in result.output
     assert "| Standard library modules | 1     |" in result.output
     assert "| External libraries       | 1     |" in result.output

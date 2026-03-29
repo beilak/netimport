@@ -18,6 +18,18 @@ TOP_ITEMS_LIMIT: Final[int] = 10
 PROJECT_FILE_NODE_TYPE: Final[str] = "project_file"
 EXTERNAL_LIB_NODE_TYPE: Final[str] = "external_lib"
 UNRESOLVED_PREFIX: Final[str] = "unresolved"
+SUMMARY_INTRO_LINES: Final[tuple[str, ...]] = (
+    (
+        "(This report summarizes the project's import graph so a reader or LLM "
+        "can spot hotspots, risky dependencies, isolated files, and missing "
+        "links.)"
+    ),
+    (
+        "(Incoming degree shows how many project files depend on a file; "
+        "outgoing degree shows how many dependencies a file pulls in. Higher "
+        "values usually mean higher impact or complexity.)"
+    ),
+)
 
 
 @dataclass(frozen=True, slots=True)
@@ -110,10 +122,31 @@ def format_summary(graph: nx.DiGraph, violations: Sequence[Violation] = ()) -> l
 
     project_entries = _build_project_entries(graph)
     sections = [
-        _build_section("Dependency Graph Summary", _format_overview(graph)),
-        _build_section("Project Coupling Metrics", _format_project_metrics(project_entries)),
+        _build_section(
+            "Dependency Graph Summary",
+            (
+                "(High-level graph totals. Use this table to quickly size the "
+                "project and see how much of the graph is project code, stdlib, "
+                "external libraries, or unresolved imports.)"
+            ),
+            _format_overview(graph),
+        ),
+        _build_section(
+            "Project Coupling Metrics",
+            (
+                "(Aggregate coupling across all project files. Avg and Median "
+                "describe a typical file, while Min and Max highlight the "
+                "spread and the biggest extremes.)"
+            ),
+            _format_project_metrics(project_entries),
+        ),
         _build_section(
             "Most Coupled Project Files",
+            (
+                "(Files with the highest total degree. Higher totals mean a "
+                "file is highly connected overall, so changes here are more "
+                "likely to ripple across the project.)"
+            ),
             _format_project_ranking(
                 sorted(
                     project_entries,
@@ -128,6 +161,11 @@ def format_summary(graph: nx.DiGraph, violations: Sequence[Violation] = ()) -> l
         ),
         _build_section(
             "Least Coupled Project Files",
+            (
+                "(Files with the lowest total degree. Very low values can "
+                "indicate isolated utilities, unfinished integration, or code "
+                "paths that deserve a second look.)"
+            ),
             _format_project_ranking(
                 sorted(
                     project_entries,
@@ -142,6 +180,11 @@ def format_summary(graph: nx.DiGraph, violations: Sequence[Violation] = ()) -> l
         ),
         _build_section(
             "Most Depended-On Project Files",
+            (
+                "(Files with the highest incoming degree. These are reuse hubs: "
+                "the more incoming links a file has, the more carefully it "
+                "should usually be changed.)"
+            ),
             _format_project_ranking(
                 sorted(
                     project_entries,
@@ -156,6 +199,11 @@ def format_summary(graph: nx.DiGraph, violations: Sequence[Violation] = ()) -> l
         ),
         _build_section(
             "Most Dependent Project Files",
+            (
+                "(Files with the highest outgoing degree. High outgoing values "
+                "often point to orchestration code, complex workflows, or "
+                "modules with many responsibilities.)"
+            ),
             _format_project_ranking(
                 sorted(
                     project_entries,
@@ -169,15 +217,35 @@ def format_summary(graph: nx.DiGraph, violations: Sequence[Violation] = ()) -> l
             ),
         ),
         _build_section(
-            "External Dependencies", _format_simple_node_list(_build_external_entries(graph))
+            "External Dependencies",
+            (
+                "(Third-party libraries imported by the project. Review this "
+                "list for dependency sprawl, standardization opportunities, and "
+                "policy or supply-chain checks.)"
+            ),
+            _format_simple_node_list(_build_external_entries(graph)),
         ),
         _build_section(
-            "Unresolved Imports", _format_unresolved_entries(_build_unresolved_entries(graph))
+            "Unresolved Imports",
+            (
+                "(Imports NetImport could not resolve. These often point to "
+                "broken imports, missing files, excluded paths, or dynamic "
+                "import patterns.)"
+            ),
+            _format_unresolved_entries(_build_unresolved_entries(graph)),
         ),
-        _build_section("Policy Violations", _format_violations(violations)),
+        _build_section(
+            "Policy Violations",
+            (
+                "(Configured rule violations found during analysis. A non-empty "
+                "table means the graph is valid to inspect, but not fully "
+                "compliant with the active policy.)"
+            ),
+            _format_violations(violations),
+        ),
     ]
 
-    lines: list[str] = []
+    lines = [*SUMMARY_INTRO_LINES, ""]
     for section_index, section in enumerate(sections):
         if section_index > 0:
             lines.append("")
@@ -263,8 +331,8 @@ def format_summary_json(graph: nx.DiGraph, violations: Sequence[Violation] = ())
     return json.dumps(build_summary_payload(graph, violations), indent=2)
 
 
-def _build_section(title: str, body_lines: Sequence[str]) -> list[str]:
-    return [title, "=" * len(title), *body_lines]
+def _build_section(title: str, description: str, body_lines: Sequence[str]) -> list[str]:
+    return [title, "=" * len(title), description, *body_lines]
 
 
 def _build_overview_summary(graph: nx.DiGraph) -> _OverviewSummary:

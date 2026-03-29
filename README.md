@@ -10,7 +10,7 @@ Install NetImport and run it against a project directory:
 
 ```bash
 pip install netimport
-netimport example --show-console-summary --no-show-graph
+netimport example --show-console-summary
 ```
 
 If you are working from this repository locally:

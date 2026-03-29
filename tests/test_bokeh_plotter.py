@@ -13,6 +13,7 @@ from netimport_lib.visualizer import bokeh_plotter
 
 
 if TYPE_CHECKING:
+    from bokeh.models.css import InlineStyleSheet
     from bokeh.plotting._figure import figure as figure_model
 
     from netimport_lib.visualizer.bokeh_plotter import FolderRectData
@@ -279,6 +280,53 @@ def test_draw_bokeh_graph_configures_headless_plot_contract(
     assert drag_tool.renderers is not None
     assert len(drag_tool.renderers) == 1
     assert len(shown_plot.select({"type": Arrow})) == 1
+
+
+def test_draw_bokeh_graph_uses_single_non_duplicated_toolbar_configuration(
+    monkeypatch: MonkeyPatch,
+) -> None:
+    graph = _build_sample_graph()
+    shown_plots: list[object] = []
+
+    monkeypatch.setattr(bokeh_plotter, "_present_plot", shown_plots.append)
+
+    bokeh_plotter.draw_bokeh_graph(graph, "constrained")
+
+    shown_plot = cast("figure_model", shown_plots[0])
+    tool_type_names = [type(tool).__name__ for tool in shown_plot.tools]
+
+    assert tool_type_names.count("PanTool") == 1
+    assert tool_type_names.count("WheelZoomTool") == 1
+    assert tool_type_names.count("BoxZoomTool") == 1
+    assert tool_type_names.count("ResetTool") == 1
+    assert tool_type_names.count("SaveTool") == 1
+    assert tool_type_names.count("TapTool") == 1
+    assert tool_type_names.count("HoverTool") == 1
+    assert tool_type_names.count("PointDrawTool") == 1
+
+
+def test_draw_bokeh_graph_places_persistent_toolbar_on_the_left(
+    monkeypatch: MonkeyPatch,
+) -> None:
+    graph = _build_sample_graph()
+    shown_plots: list[object] = []
+
+    monkeypatch.setattr(bokeh_plotter, "_present_plot", shown_plots.append)
+
+    bokeh_plotter.draw_bokeh_graph(graph, "constrained")
+
+    shown_plot = cast("figure_model", shown_plots[0])
+    toolbar_stylesheet = cast("InlineStyleSheet", shown_plot.toolbar.stylesheets[0])
+
+    assert shown_plot.toolbar_location == "left"
+    assert shown_plot.toolbar_inner is True
+    assert shown_plot.toolbar_sticky is True
+    assert shown_plot.toolbar.logo is None
+    assert shown_plot.toolbar.autohide is False
+    assert shown_plot.toolbar.stylesheets is not None
+    assert len(shown_plot.toolbar.stylesheets) == 1
+    assert "position: fixed" in toolbar_stylesheet.css
+    assert "left: 16px" in toolbar_stylesheet.css
 
 
 def test_present_plot_returns_manual_open_message_when_auto_open_is_skipped(

@@ -18,6 +18,7 @@ import networkx as nx
 from bokeh.io import save
 from bokeh.models.annotations.arrows import Arrow, OpenHead
 from bokeh.models.annotations.labels import LabelSet
+from bokeh.models.css import InlineStyleSheet
 from bokeh.models.glyphs import MultiLine, Scatter
 from bokeh.models.graphs import NodesAndLinkedEdges
 from bokeh.models.renderers import GraphRenderer
@@ -157,6 +158,11 @@ BASE_PLOT_HEIGHT: Final[int] = 720
 MAX_PLOT_WIDTH: Final[int] = 2400
 MAX_PLOT_HEIGHT: Final[int] = 1800
 PLOT_PIXELS_PER_LAYOUT_UNIT: Final[float] = 24.0
+TOOLBAR_BUTTON_WIDTH_PX: Final[int] = 38
+TOOLBAR_BUTTON_HEIGHT_PX: Final[int] = 38
+TOOLBAR_ICON_SCALE_PERCENT: Final[int] = 72
+TOOLBAR_VIEWPORT_LEFT_PX: Final[int] = 16
+TOOLBAR_VIEWPORT_TOP_PX: Final[int] = 16
 COLOR_MAP: Final[Mapping[str, str]] = MappingProxyType(
     {
         "project_file": "skyblue",
@@ -866,6 +872,35 @@ def _to_int(value: object) -> int:
     return 0
 
 
+def _build_toolbar_stylesheet() -> InlineStyleSheet:
+    return InlineStyleSheet(
+        css=(
+            ":host {"
+            f" --button-width: {TOOLBAR_BUTTON_WIDTH_PX}px;"
+            f" --button-height: {TOOLBAR_BUTTON_HEIGHT_PX}px;"
+            " position: fixed;"
+            f" left: {TOOLBAR_VIEWPORT_LEFT_PX}px;"
+            f" top: {TOOLBAR_VIEWPORT_TOP_PX}px;"
+            " z-index: 1000;"
+            " padding: 6px;"
+            " border-radius: 12px;"
+            " border: 1px solid rgba(15, 23, 42, 0.14);"
+            " background: rgba(255, 255, 255, 0.94);"
+            " box-shadow: 0 12px 28px rgba(15, 23, 42, 0.18);"
+            " backdrop-filter: blur(8px);"
+            " }"
+            " .bk-tool-icon {"
+            f" mask-size: {TOOLBAR_ICON_SCALE_PERCENT}% {TOOLBAR_ICON_SCALE_PERCENT}%;"
+            f" -webkit-mask-size: {TOOLBAR_ICON_SCALE_PERCENT}% {TOOLBAR_ICON_SCALE_PERCENT}%;"
+            f" background-size: {TOOLBAR_ICON_SCALE_PERCENT}% {TOOLBAR_ICON_SCALE_PERCENT}%;"
+            " }"
+            " .bk-divider {"
+            " opacity: 0.35;"
+            " }"
+        )
+    )
+
+
 def _create_bokeh_plot(
     folder_rect_data: FolderRectData,
     plot_dimensions: PlotDimensions,
@@ -874,6 +909,13 @@ def _create_bokeh_plot(
     plot.output_backend = "webgl"
     plot.width = plot_dimensions.width
     plot.height = plot_dimensions.height
+    plot.toolbar_location = "left"
+    plot.toolbar_inner = True
+    plot.toolbar_sticky = True
+    plot.toolbar.tools = []
+    plot.toolbar.logo = None
+    plot.toolbar.autohide = False
+    plot.toolbar.stylesheets = [_build_toolbar_stylesheet()]
 
     pan_tool = PanTool()
     hover_tool = HoverTool()

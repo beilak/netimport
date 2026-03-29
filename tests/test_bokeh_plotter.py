@@ -1,3 +1,4 @@
+from pathlib import Path
 from typing import TYPE_CHECKING, cast
 
 import networkx as nx
@@ -109,7 +110,7 @@ def test_draw_bokeh_graph_smoke_headless_without_mutating_input(
     graph = _build_sample_graph()
     shown_plots: list[object] = []
 
-    monkeypatch.setattr(bokeh_plotter_v2, "show", lambda plot: shown_plots.append(plot))
+    monkeypatch.setattr(bokeh_plotter_v2, "_present_plot", shown_plots.append)
 
     bokeh_plotter_v2.draw_bokeh_graph(graph, "constrained")
 
@@ -125,7 +126,7 @@ def test_draw_bokeh_graph_configures_headless_plot_contract(
     graph = _build_sample_graph()
     shown_plots: list[object] = []
 
-    monkeypatch.setattr(bokeh_plotter_v2, "show", lambda plot: shown_plots.append(plot))
+    monkeypatch.setattr(bokeh_plotter_v2, "_present_plot", shown_plots.append)
 
     bokeh_plotter_v2.draw_bokeh_graph(graph, "constrained")
 
@@ -147,3 +148,35 @@ def test_draw_bokeh_graph_configures_headless_plot_contract(
     assert drag_tool.renderers is not None
     assert len(drag_tool.renderers) == 1
     assert len(shown_plot.select({"type": Arrow})) == 1
+
+
+def test_present_plot_returns_manual_open_message_when_auto_open_is_skipped(
+    monkeypatch: MonkeyPatch,
+    tmp_path: Path,
+) -> None:
+    output_path = tmp_path / "netimport-graph.html"
+
+    monkeypatch.setattr(bokeh_plotter_v2, "_save_plot", lambda _plot: output_path)
+    monkeypatch.setattr(bokeh_plotter_v2, "_open_saved_plot", lambda _path: False)
+
+    message = bokeh_plotter_v2.draw_bokeh_graph(_build_sample_graph(), "constrained")
+
+    assert message == (
+        "Interactive dependency graph saved to "
+        f"{output_path}. Automatic browser launch is unavailable in this environment; "
+        "open the file manually."
+    )
+
+
+def test_draw_bokeh_graph_returns_no_message_when_auto_open_succeeds(
+    monkeypatch: MonkeyPatch,
+    tmp_path: Path,
+) -> None:
+    output_path = tmp_path / "netimport-graph.html"
+
+    monkeypatch.setattr(bokeh_plotter_v2, "_save_plot", lambda _plot: output_path)
+    monkeypatch.setattr(bokeh_plotter_v2, "_open_saved_plot", lambda _path: True)
+
+    message = bokeh_plotter_v2.draw_bokeh_graph(_build_sample_graph(), "constrained")
+
+    assert message is None

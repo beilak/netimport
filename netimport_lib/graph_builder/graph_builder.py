@@ -15,6 +15,12 @@ from netimport_lib.graph_builder.resolver_imports import (
 
 
 PROJECT_FILE_NODE_TYPE: Final[str] = "project_file"
+STANDARD_LIBRARY_NODE_TYPE: Final[str] = "std_lib"
+EXTERNAL_LIBRARY_NODE_TYPE: Final[str] = "external_lib"
+UNRESOLVED_NODE_PREFIX: Final[str] = "unresolved"
+STANDARD_LIBRARY_FOLDER: Final[str] = "Standard library"
+EXTERNAL_DEPENDENCIES_FOLDER: Final[str] = "External dependencies"
+UNRESOLVED_IMPORTS_FOLDER: Final[str] = "Unresolved imports"
 
 
 @dataclass(frozen=True, slots=True)
@@ -134,12 +140,35 @@ def _add_target_node_and_edge(
 
 def _populate_node_metadata(graph: nx.DiGraph, project_root: str) -> None:
     for node_id in graph.nodes():
-        display_folder = _get_display_folder_name(str(node_id), project_root)
+        node_type = str(graph.nodes[node_id].get("type", ""))
+        display_folder, is_root_folder = _build_folder_metadata(
+            str(node_id),
+            node_type,
+            project_root,
+        )
         graph.nodes[node_id]["folder"] = display_folder
-        graph.nodes[node_id]["is_root_folder"] = display_folder == project_root
+        graph.nodes[node_id]["is_root_folder"] = is_root_folder
         graph.nodes[node_id]["in_degree"] = graph.in_degree(node_id)
         graph.nodes[node_id]["out_degree"] = graph.out_degree(node_id)
         graph.nodes[node_id]["total_degree"] = graph.degree(node_id)
+
+
+def _build_folder_metadata(
+    node_id: str,
+    node_type: str,
+    project_root: str,
+) -> tuple[str, bool]:
+    if node_type == PROJECT_FILE_NODE_TYPE:
+        display_folder = _get_display_folder_name(node_id, project_root)
+        return display_folder, display_folder == project_root
+    if node_type == STANDARD_LIBRARY_NODE_TYPE:
+        return STANDARD_LIBRARY_FOLDER, False
+    if node_type == EXTERNAL_LIBRARY_NODE_TYPE:
+        return EXTERNAL_DEPENDENCIES_FOLDER, False
+    if node_type.startswith(UNRESOLVED_NODE_PREFIX):
+        return UNRESOLVED_IMPORTS_FOLDER, False
+
+    return "Other dependencies", False
 
 
 def _get_display_folder_name(full_path: str, project_root: str) -> str:

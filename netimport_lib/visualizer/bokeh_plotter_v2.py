@@ -1,12 +1,20 @@
 """Bokeh-based graph rendering."""
 
+import os
+import shutil
+import subprocess
+import sys
+import tempfile
+import webbrowser
 from collections import defaultdict
 from collections.abc import Mapping, Sequence
 from dataclasses import dataclass
+from pathlib import Path
 from types import MappingProxyType
 from typing import Final, TypedDict, cast
 
 import networkx as nx
+from bokeh.io import save
 from bokeh.models.annotations.arrows import Arrow, OpenHead
 from bokeh.models.annotations.labels import LabelSet
 from bokeh.models.glyphs import MultiLine, Scatter
@@ -23,8 +31,10 @@ from bokeh.models.tools import (
     TapTool,
     WheelZoomTool,
 )
-from bokeh.plotting import from_networkx, show
+from bokeh.plotting import from_networkx
 from bokeh.plotting._figure import figure as figure_model
+from bokeh.resources import CDN
+from bokeh.util.browser import get_browser_controller
 
 
 class FolderRectData(TypedDict):
@@ -86,6 +96,10 @@ COLOR_MAP: Final[Mapping[str, str]] = MappingProxyType(
     }
 )
 DEFAULT_NODE_COLOR: Final[str] = "red"
+BOKEH_OUTPUT_PREFIX: Final[str] = "netimport-"
+BOKEH_OUTPUT_SUFFIX: Final[str] = ".html"
+BOKEH_PLOT_TITLE: Final[str] = "NetImport dependency graph"
+SKIPPED_AUTO_OPEN_CONTROLLER_NAMES: Final[frozenset[str]] = frozenset({"MacOSXOSAScript"})
 
 
 def _normalize_layout_positions(
@@ -508,6 +522,89 @@ def _enable_node_dragging(plot: figure_model, graph_renderer: GraphRenderer) -> 
     plot.toolbar.active_drag = point_draw_tool
 
 
+def _build_bokeh_output_path() -> Path:
+    with tempfile.NamedTemporaryFile(
+        prefix=BOKEH_OUTPUT_PREFIX,
+        suffix=BOKEH_OUTPUT_SUFFIX,
+        delete=False,
+    ) as file_handle:
+        return Path(file_handle.name)
+
+
+def _save_plot(plot: figure_model) -> Path:
+    output_path = _build_bokeh_output_path()
+    save(plot, filename=output_path, resources=CDN, title=BOKEH_PLOT_TITLE)
+    return output_path
+
+
+def _run_open_command(command: Sequence[str]) -> bool:
+    try:
+        completed_process = subprocess.run(  # noqa: S603
+            command,
+            check=False,
+            stdout=subprocess.DEVNULL,
+            stderr=subprocess.DEVNULL,
+        )
+    except OSError:
+        return False
+
+    return completed_process.returncode == 0
+
+
+def _open_with_platform_command(output_path: Path) -> bool:
+    if sys.platform == "darwin":
+        return _run_open_command(("open", str(output_path)))
+
+    if sys.platform.startswith("linux"):
+        opener = shutil.which("xdg-open")
+        if opener is None:
+            return False
+        return _run_open_command((opener, str(output_path)))
+
+    if os.name == "nt":
+        try:
+            os.startfile(str(output_path))  # noqa: S606
+        except OSError:
+            return False
+        return True
+
+    return False
+
+
+def _should_skip_auto_open(controller: object) -> bool:
+    if controller is webbrowser and sys.platform == "darwin":
+        return True
+    return controller.__class__.__name__ in SKIPPED_AUTO_OPEN_CONTROLLER_NAMES
+
+
+def _open_saved_plot(output_path: Path) -> bool:
+    if _open_with_platform_command(output_path):
+        return True
+
+    try:
+        controller = get_browser_controller(browser=None)
+        if _should_skip_auto_open(controller):
+            return False
+        return bool(controller.open(output_path.as_uri(), new=2, autoraise=True))
+    except (OSError, webbrowser.Error):
+        return False
+
+
+def _build_manual_open_message(output_path: Path) -> str:
+    return (
+        "Interactive dependency graph saved to "
+        f"{output_path}. Automatic browser launch is unavailable in this environment; "
+        "open the file manually."
+    )
+
+
+def _present_plot(plot: figure_model) -> str | None:
+    output_path = _save_plot(plot)
+    if _open_saved_plot(output_path):
+        return None
+    return _build_manual_open_message(output_path)
+
+
 def prepare_bokeh_render(graph: nx.DiGraph, layout: str) -> PreparedBokehRender:
     """Prepare layout and visual attributes for Bokeh rendering."""
     final_positions, folder_rect_data = _build_bokeh_layout(graph, layout)
@@ -520,7 +617,7 @@ def prepare_bokeh_render(graph: nx.DiGraph, layout: str) -> PreparedBokehRender:
     )
 
 
-def draw_bokeh_graph(graph: nx.DiGraph, layout: str) -> None:
+def draw_bokeh_graph(graph: nx.DiGraph, layout: str) -> str | None:
     """Render a dependency graph with Bokeh."""
     render_data = prepare_bokeh_render(graph, layout)
     graph_to_draw = _copy_graph_with_visual_data(graph, render_data.node_visual_data)
@@ -539,4 +636,4 @@ def draw_bokeh_graph(graph: nx.DiGraph, layout: str) -> None:
     _enable_node_dragging(plot, graph_renderer)
     plot.renderers.append(graph_renderer)
 
-    show(plot)
+    return _present_plot(plot)

@@ -367,6 +367,71 @@ def test_cli_accepts_supported_backend_and_layout_combination(
     assert visualizer_calls == [("mpl", "circular")]
 
 
+def test_cli_prints_visualizer_message(monkeypatch: MonkeyPatch, tmp_path: Path) -> None:
+    project_root = tmp_path / "sample_project"
+    project_root.mkdir()
+
+    (project_root / "main.py").write_text("import helper\n", encoding="utf-8")
+    (project_root / "helper.py").write_text("", encoding="utf-8")
+
+    def fake_visualizer(_graph: nx.DiGraph, _layout: str) -> str:
+        return "Saved interactive graph to /tmp/netimport-graph.html"
+
+    monkeypatch.setattr(
+        cli,
+        "GRAPH_VISUALIZERS",
+        {
+            "bokeh": GraphVisualizer(
+                name="bokeh",
+                render=fake_visualizer,
+                supported_layouts=("constrained",),
+                default_layout="constrained",
+            )
+        },
+    )
+    monkeypatch.setattr(cli, "load_config", _default_loaded_config)
+
+    runner: Final[CliRunner] = CliRunner()
+    result = runner.invoke(cli.main, [str(project_root)])
+
+    assert result.exit_code == 0
+    assert "Saved interactive graph to /tmp/netimport-graph.html" in result.output
+
+
+def test_cli_wraps_visualizer_errors_in_click_exception(
+    monkeypatch: MonkeyPatch,
+    tmp_path: Path,
+) -> None:
+    project_root = tmp_path / "sample_project"
+    project_root.mkdir()
+
+    (project_root / "main.py").write_text("import helper\n", encoding="utf-8")
+    (project_root / "helper.py").write_text("", encoding="utf-8")
+
+    def fake_visualizer(_graph: nx.DiGraph, _layout: str) -> None:
+        raise RuntimeError("automatic browser launch failed")
+
+    monkeypatch.setattr(
+        cli,
+        "GRAPH_VISUALIZERS",
+        {
+            "bokeh": GraphVisualizer(
+                name="bokeh",
+                render=fake_visualizer,
+                supported_layouts=("constrained",),
+                default_layout="constrained",
+            )
+        },
+    )
+    monkeypatch.setattr(cli, "load_config", _default_loaded_config)
+
+    runner: Final[CliRunner] = CliRunner()
+    result = runner.invoke(cli.main, [str(project_root)])
+
+    assert result.exit_code != 0
+    assert "Failed to render graph with 'bokeh': automatic browser launch failed" in result.output
+
+
 def test_cli_rejects_unsupported_backend_and_layout_combination(tmp_path: Path) -> None:
     project_root = tmp_path / "sample_project"
     project_root.mkdir()

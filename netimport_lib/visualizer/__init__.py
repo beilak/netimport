@@ -3,12 +3,12 @@
 import importlib
 from collections.abc import Callable
 from dataclasses import dataclass
-from typing import Final
+from typing import Final, cast
 
 import networkx as nx
 
 
-GraphRenderFunc = Callable[[nx.DiGraph, str], None]
+GraphRenderFunc = Callable[[nx.DiGraph, str], str | None]
 
 
 @dataclass(frozen=True, slots=True)
@@ -21,20 +21,22 @@ class GraphVisualizer:
     default_layout: str
 
 
-def _render_bokeh(graph: nx.DiGraph, layout: str) -> None:
-    draw_bokeh_graph = importlib.import_module(
-        "netimport_lib.visualizer.bokeh_plotter_v2"
-    ).draw_bokeh_graph
+def _render_bokeh(graph: nx.DiGraph, layout: str) -> str | None:
+    draw_bokeh_graph = cast(
+        "GraphRenderFunc",
+        importlib.import_module("netimport_lib.visualizer.bokeh_plotter_v2").draw_bokeh_graph,
+    )
 
-    draw_bokeh_graph(graph, layout)
+    return draw_bokeh_graph(graph, layout)
 
 
-def _render_mpl(graph: nx.DiGraph, layout: str) -> None:
-    draw_graph_mpl = importlib.import_module(
-        "netimport_lib.visualizer.mpl_plotter"
-    ).draw_graph_mpl
+def _render_mpl(graph: nx.DiGraph, layout: str) -> str | None:
+    draw_graph_mpl = cast(
+        "GraphRenderFunc",
+        importlib.import_module("netimport_lib.visualizer.mpl_plotter").draw_graph_mpl,
+    )
 
-    draw_graph_mpl(graph, layout)
+    return draw_graph_mpl(graph, layout)
 
 
 MPL_LAYOUTS: Final[tuple[str, ...]] = (

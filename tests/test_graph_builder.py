@@ -2,6 +2,7 @@ import os
 from pathlib import Path
 
 import networkx as nx
+from _pytest.monkeypatch import MonkeyPatch
 
 from netimport_lib.graph_builder.graph_builder import (
     IgnoreConfigNode,
@@ -186,3 +187,45 @@ def test_build_dependency_graph_adds_unresolved_relative_too_many_dots_nodes(
 
     assert graph.has_edge(str(source_path), "...helper")
     assert graph.nodes["...helper"]["type"] == "unresolved_relative_too_many_dots"
+
+
+def test_build_dependency_graph_assigns_stable_folder_metadata_to_non_project_nodes(
+    monkeypatch: MonkeyPatch,
+    tmp_path: Path,
+) -> None:
+    caller_root = tmp_path / "caller"
+    caller_root.mkdir()
+    monkeypatch.chdir(caller_root)
+
+    project_root = tmp_path / "project"
+    package_dir = project_root / "pkg"
+    package_dir.mkdir(parents=True)
+
+    source_path = package_dir / "module.py"
+    file_imports_map = {
+        str(source_path): ["os", "requests", ".missing"],
+    }
+
+    ignore_config = IgnoreConfigNode(
+        nodes=set(),
+        stdlib=False,
+        external_lib=False,
+    )
+
+    graph = build_dependency_graph(
+        file_imports_map=file_imports_map,
+        project_root=str(project_root),
+        ignore=ignore_config,
+    )
+
+    assert graph.nodes[str(source_path)]["folder"] == str(package_dir)
+    assert graph.nodes[str(source_path)]["is_root_folder"] is False
+    assert graph.nodes["os"]["folder"] == "Standard library"
+    assert graph.nodes["os"]["is_root_folder"] is False
+    assert graph.nodes["requests"]["folder"] == "External dependencies"
+    assert graph.nodes["requests"]["is_root_folder"] is False
+    assert graph.nodes[".missing"]["folder"] == "Unresolved imports"
+    assert graph.nodes[".missing"]["is_root_folder"] is False
+    assert graph.nodes["os"]["folder"] != str(caller_root)
+    assert graph.nodes["requests"]["folder"] != str(caller_root)
+    assert graph.nodes[".missing"]["folder"] != str(caller_root)

@@ -186,7 +186,14 @@ def main(  # noqa: PLR0913
     )
 
     if selected_visualizer is not None and selected_layout is not None:
-        selected_visualizer.render(dependency_graph, selected_layout)
+        try:
+            render_message = selected_visualizer.render(dependency_graph, selected_layout)
+        except Exception as exc:
+            raise click.ClickException(
+                f"Failed to render graph with '{selected_visualizer.name}': {exc}"
+            ) from exc
+        if render_message:
+            click.echo(render_message)
 
     if show_console_summary:
         if summary_format == "json":

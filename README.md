@@ -4,6 +4,24 @@ NetImport is a static analysis CLI for Python projects. It scans source files, p
 
 It is intended for architecture inspection, refactoring support, and CI-friendly dependency review. The current release is positioned as a beta-stage developer tool: the core workflows are implemented and tested, while known static-analysis limitations are documented explicitly.
 
+## Quick Start
+
+Install NetImport and run it against a project directory:
+
+```bash
+pip install netimport
+netimport example --show-console-summary --no-show-graph
+```
+
+If you are working from this repository locally:
+
+```bash
+poetry install
+poetry run netimport example --show-console-summary --no-show-graph
+```
+
+Remove `--no-show-graph` if you want to open the graph visualization instead of running in summary-only mode.
+
 ## Core Features
 
 *   **Import Analysis:** Recursively scans the specified project directory for Python files and parses their `import` statements.

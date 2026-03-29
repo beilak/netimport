@@ -23,10 +23,10 @@ def test_visualizer_defaults_are_supported_and_public_layouts_match_registry() -
 
 
 def test_visualizer_registry_does_not_eagerly_import_render_backends() -> None:
-    sys.modules.pop("netimport_lib.visualizer.bokeh_plotter_v2", None)
+    sys.modules.pop("netimport_lib.visualizer.bokeh_plotter", None)
     sys.modules.pop("netimport_lib.visualizer.mpl_plotter", None)
 
     importlib.reload(visualizer_module)
 
-    assert "netimport_lib.visualizer.bokeh_plotter_v2" not in sys.modules
+    assert "netimport_lib.visualizer.bokeh_plotter" not in sys.modules
     assert "netimport_lib.visualizer.mpl_plotter" not in sys.modules

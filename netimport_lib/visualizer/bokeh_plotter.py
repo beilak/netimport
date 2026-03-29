@@ -1,5 +1,6 @@
 """Bokeh-based graph rendering."""
 
+import math
 import os
 import shutil
 import subprocess
@@ -42,6 +43,7 @@ class FolderRectData(TypedDict):
 
     x: list[float]
     y: list[float]
+    label_y: list[float]
     width: list[float]
     height: list[float]
     name: list[str]
@@ -81,9 +83,49 @@ class PreparedBokehRender:
     node_visual_data: dict[object, NodeVisualData]
 
 
+@dataclass(frozen=True, slots=True)
+class LocalNodeLayout:
+    """Relative node placement within a container block."""
+
+    width: float
+    height: float
+    positions: dict[str, tuple[float, float]]
+
+
+@dataclass(frozen=True, slots=True)
+class PackedBoxLayout:
+    """Packed child-box placement within a container block."""
+
+    width: float
+    height: float
+    origins: dict[str, tuple[float, float]]
+
+
+@dataclass(frozen=True, slots=True)
+class ContainerLayout:
+    """Computed box geometry for a folder or synthetic root container."""
+
+    width: float
+    height: float
+    node_positions: dict[str, tuple[float, float]]
+    child_origins: dict[str, tuple[float, float]]
+
+
 FREEZE_RANDOM_SEED: Final[int] = 42
 LABEL_PADDING: Final[float] = 20.0
 MIN_NODE_SIZE: Final[int] = 20
+MIN_NODE_BLOCK_SPAN: Final[float] = 4.0
+NODE_BLOCK_CELL_SPAN: Final[float] = 4.0
+NODE_LAYOUT_INSET: Final[float] = 0.75
+FOLDER_PADDING_X: Final[float] = 1.5
+FOLDER_PADDING_Y: Final[float] = 1.5
+FOLDER_LABEL_HEIGHT: Final[float] = 1.75
+FOLDER_SECTION_GAP: Final[float] = 1.5
+FOLDER_GRID_GAP_X: Final[float] = 2.0
+FOLDER_GRID_GAP_Y: Final[float] = 2.0
+ROOT_SECTION_GAP: Final[float] = 3.0
+MIN_FOLDER_CONTENT_WIDTH: Final[float] = 4.0
+MIN_FOLDER_CONTENT_HEIGHT: Final[float] = 3.0
 COLOR_MAP: Final[Mapping[str, str]] = MappingProxyType(
     {
         "project_file": "skyblue",
@@ -115,7 +157,8 @@ def _collect_folder_nodes(graph: nx.DiGraph) -> tuple[dict[str, list[str]], list
     folder_to_nodes: defaultdict[str, list[str]] = defaultdict(list)
     root_folder_nodes: list[str] = []
 
-    for node_id, data in graph.nodes(data=True):
+    ordered_nodes = sorted(graph.nodes(data=True), key=lambda item: str(item[0]))
+    for node_id, data in ordered_nodes:
         node_name = str(node_id)
         folder_name = str(data.get("folder", ""))
         if bool(data.get("is_root_folder", False)):
@@ -127,168 +170,400 @@ def _collect_folder_nodes(graph: nx.DiGraph) -> tuple[dict[str, list[str]], list
     return dict(folder_to_nodes), root_folder_nodes
 
 
-def _build_folder_graph(folder_to_nodes: Mapping[str, Sequence[str]]) -> nx.Graph:
-    folder_graph = nx.Graph()
-    all_folders = set(folder_to_nodes)
+def _build_folder_hierarchy(
+    folder_to_nodes: Mapping[str, Sequence[str]],
+) -> tuple[list[str], dict[str, list[str]]]:
+    all_folders = tuple(sorted(folder_to_nodes))
+    folder_set = set(all_folders)
+    root_folders: list[str] = []
+    child_folders: dict[str, list[str]] = {folder_name: [] for folder_name in all_folders}
 
     for folder_name in all_folders:
-        folder_graph.add_node(folder_name, label=folder_name.split("/")[-1])
         parent_folder = "/".join(folder_name.split("/")[:-1])
-        if parent_folder in all_folders:
-            folder_graph.add_edge(parent_folder, folder_name)
+        if parent_folder in folder_set:
+            child_folders[parent_folder].append(folder_name)
+            continue
+        root_folders.append(folder_name)
 
-    return folder_graph
+    for siblings in child_folders.values():
+        siblings.sort()
+    root_folders.sort()
+
+    return root_folders, child_folders
 
 
-def _build_folder_positions(
-    folder_graph: nx.Graph,
-    folder_layout_k: float,
+def _build_sorted_layout_subgraph(
+    graph: nx.DiGraph,
+    node_ids: Sequence[str],
+) -> nx.DiGraph:
+    ordered_nodes = tuple(sorted(node_ids))
+    subgraph = nx.DiGraph()
+    for node_id in ordered_nodes:
+        subgraph.add_node(node_id)
+    candidate_edges = sorted(
+        graph.subgraph(ordered_nodes).edges(),
+        key=lambda edge: (str(edge[0]), str(edge[1])),
+    )
+    for start_node, end_node in candidate_edges:
+        subgraph.add_edge(start_node, end_node)
+    return subgraph
+
+
+def _scale_positions_to_block(
+    raw_positions: Mapping[str, tuple[float, float]],
+    *,
+    width: float,
+    height: float,
+    inset: float,
 ) -> dict[str, tuple[float, float]]:
-    return _normalize_layout_positions(
+    if not raw_positions:
+        return {}
+
+    x_values = [x_coord for x_coord, _ in raw_positions.values()]
+    y_values = [y_coord for _, y_coord in raw_positions.values()]
+    min_x = min(x_values)
+    max_x = max(x_values)
+    min_y = min(y_values)
+    max_y = max(y_values)
+    usable_width = max(width - 2 * inset, 0.0)
+    usable_height = max(height - 2 * inset, 0.0)
+    center_x = width / 2.0
+    center_y = height / 2.0
+    scaled_positions: dict[str, tuple[float, float]] = {}
+
+    for node_id in sorted(raw_positions):
+        raw_x, raw_y = raw_positions[node_id]
+        if max_x == min_x:
+            scaled_x = center_x
+        else:
+            scaled_x = inset + ((raw_x - min_x) / (max_x - min_x)) * usable_width
+        if max_y == min_y:
+            scaled_y = center_y
+        else:
+            scaled_y = inset + ((raw_y - min_y) / (max_y - min_y)) * usable_height
+        scaled_positions[node_id] = (scaled_x, scaled_y)
+
+    return scaled_positions
+
+
+def _build_local_node_layout(
+    graph: nx.DiGraph,
+    node_ids: Sequence[str],
+    node_layout_k: float,
+) -> LocalNodeLayout:
+    ordered_nodes = tuple(sorted(node_ids))
+    if not ordered_nodes:
+        return LocalNodeLayout(width=0.0, height=0.0, positions={})
+
+    if len(ordered_nodes) == 1:
+        width = MIN_NODE_BLOCK_SPAN
+        height = MIN_NODE_BLOCK_SPAN
+        return LocalNodeLayout(
+            width=width,
+            height=height,
+            positions={ordered_nodes[0]: (width / 2.0, height / 2.0)},
+        )
+
+    column_count = max(1, math.ceil(math.sqrt(len(ordered_nodes))))
+    row_count = math.ceil(len(ordered_nodes) / column_count)
+    width = max(MIN_NODE_BLOCK_SPAN, float(column_count) * NODE_BLOCK_CELL_SPAN)
+    height = max(MIN_NODE_BLOCK_SPAN, float(row_count) * NODE_BLOCK_CELL_SPAN)
+    subgraph = _build_sorted_layout_subgraph(graph, ordered_nodes)
+    raw_positions = _normalize_layout_positions(
         cast(
             "Mapping[str, Sequence[float]]",
             nx.spring_layout(
-                folder_graph,
-                k=folder_layout_k,
-                iterations=100,
+                subgraph,
+                k=node_layout_k,
+                iterations=50,
                 seed=FREEZE_RANDOM_SEED,
-                scale=20,
+                scale=1,
             ),
         )
     )
+    return LocalNodeLayout(
+        width=width,
+        height=height,
+        positions=_scale_positions_to_block(
+            raw_positions,
+            width=width,
+            height=height,
+            inset=NODE_LAYOUT_INSET,
+        ),
+    )
 
 
-def _place_nodes_within_folders(
-    graph: nx.DiGraph,
-    folder_to_nodes: Mapping[str, Sequence[str]],
-    folder_positions: Mapping[str, tuple[float, float]],
-    node_layout_k: float,
-) -> dict[str, tuple[float, float]]:
-    final_positions: dict[str, tuple[float, float]] = {}
+def _pack_boxes(
+    item_sizes: Sequence[tuple[str, float, float]],
+    *,
+    gap_x: float,
+    gap_y: float,
+) -> PackedBoxLayout:
+    ordered_items = tuple(sorted(item_sizes, key=lambda item: item[0]))
+    if not ordered_items:
+        return PackedBoxLayout(width=0.0, height=0.0, origins={})
 
-    for folder_name, nodes_in_folder in folder_to_nodes.items():
-        subgraph = graph.subgraph(nodes_in_folder)
-        local_positions = _normalize_layout_positions(
-            cast(
-                "Mapping[str, Sequence[float]]",
-                nx.spring_layout(
-                    subgraph,
-                    k=node_layout_k,
-                    iterations=50,
-                    seed=FREEZE_RANDOM_SEED,
-                    scale=1,
-                ),
-            )
+    if len(ordered_items) == 1:
+        item_name, item_width, item_height = ordered_items[0]
+        return PackedBoxLayout(
+            width=item_width,
+            height=item_height,
+            origins={item_name: (0.0, 0.0)},
         )
-        folder_center_x, folder_center_y = folder_positions[folder_name]
-        for node_id, (x_coord, y_coord) in local_positions.items():
-            final_positions[node_id] = (x_coord + folder_center_x, y_coord + folder_center_y)
 
-    return final_positions
+    column_count = max(1, math.ceil(math.sqrt(len(ordered_items))))
+    row_count = math.ceil(len(ordered_items) / column_count)
+    column_widths = [0.0] * column_count
+    row_heights = [0.0] * row_count
+
+    for index, (_item_name, item_width, item_height) in enumerate(ordered_items):
+        row_index = index // column_count
+        column_index = index % column_count
+        column_widths[column_index] = max(column_widths[column_index], item_width)
+        row_heights[row_index] = max(row_heights[row_index], item_height)
+
+    total_width = sum(column_widths) + gap_x * max(column_count - 1, 0)
+    total_height = sum(row_heights) + gap_y * max(row_count - 1, 0)
+    x_offsets: list[float] = []
+    current_x = 0.0
+    for column_width in column_widths:
+        x_offsets.append(current_x)
+        current_x += column_width + gap_x
+
+    row_bottoms: list[float] = []
+    current_y_top = total_height
+    for row_height in row_heights:
+        row_bottom = current_y_top - row_height
+        row_bottoms.append(row_bottom)
+        current_y_top = row_bottom - gap_y
+
+    origins: dict[str, tuple[float, float]] = {}
+    for index, (item_name, item_width, item_height) in enumerate(ordered_items):
+        row_index = index // column_count
+        column_index = index % column_count
+        origin_x = x_offsets[column_index] + (column_widths[column_index] - item_width) / 2.0
+        origin_y = row_bottoms[row_index] + (row_heights[row_index] - item_height) / 2.0
+        origins[item_name] = (origin_x, origin_y)
+
+    return PackedBoxLayout(width=total_width, height=total_height, origins=origins)
 
 
-def _get_folder_and_child_nodes(
+def _build_folder_container_layout(  # noqa: PLR0913
+    graph: nx.DiGraph,
     folder_name: str,
     folder_to_nodes: Mapping[str, Sequence[str]],
-    sorted_folders: Sequence[str],
-) -> list[str]:
-    all_child_nodes = list(folder_to_nodes[folder_name])
-    for other_folder in sorted_folders:
-        if other_folder.startswith(folder_name + "/"):
-            all_child_nodes.extend(folder_to_nodes[other_folder])
+    child_folders: Mapping[str, Sequence[str]],
+    node_layout_k: float,
+    folder_layouts: dict[str, ContainerLayout],
+) -> ContainerLayout:
+    direct_nodes_layout = _build_local_node_layout(
+        graph,
+        folder_to_nodes.get(folder_name, ()),
+        node_layout_k,
+    )
+    child_names = tuple(sorted(child_folders.get(folder_name, ())))
+    child_box_sizes = [
+        (child_name, folder_layouts[child_name].width, folder_layouts[child_name].height)
+        for child_name in child_names
+    ]
+    packed_children = _pack_boxes(
+        child_box_sizes,
+        gap_x=FOLDER_GRID_GAP_X,
+        gap_y=FOLDER_GRID_GAP_Y,
+    )
+    content_width = max(
+        MIN_FOLDER_CONTENT_WIDTH,
+        direct_nodes_layout.width,
+        packed_children.width,
+    )
+    sections_height = packed_children.height + direct_nodes_layout.height
+    if packed_children.height > 0.0 and direct_nodes_layout.height > 0.0:
+        sections_height += FOLDER_SECTION_GAP
+    content_height = max(MIN_FOLDER_CONTENT_HEIGHT, sections_height)
+    child_origin_x = FOLDER_PADDING_X + (content_width - packed_children.width) / 2.0
+    child_origin_y = FOLDER_PADDING_Y
+    direct_origin_x = FOLDER_PADDING_X + (content_width - direct_nodes_layout.width) / 2.0
+    has_child_section = packed_children.height > 0.0
+    has_direct_node_section = direct_nodes_layout.height > 0.0
+    section_gap = (
+        FOLDER_SECTION_GAP if has_child_section and has_direct_node_section else 0.0
+    )
+    direct_origin_y = (
+        FOLDER_PADDING_Y
+        + packed_children.height
+        + section_gap
+    )
+    node_positions = {
+        node_id: (direct_origin_x + local_x, direct_origin_y + local_y)
+        for node_id, (local_x, local_y) in direct_nodes_layout.positions.items()
+    }
+    child_origins = {
+        child_name: (child_origin_x + local_x, child_origin_y + local_y)
+        for child_name, (local_x, local_y) in packed_children.origins.items()
+    }
 
-    return all_child_nodes
+    return ContainerLayout(
+        width=content_width + 2 * FOLDER_PADDING_X,
+        height=content_height + 2 * FOLDER_PADDING_Y + FOLDER_LABEL_HEIGHT,
+        node_positions=node_positions,
+        child_origins=child_origins,
+    )
 
 
-def _build_folder_rect_data(
-    folder_to_nodes: Mapping[str, Sequence[str]],
-    final_positions: Mapping[str, tuple[float, float]],
-    *,
-    padding: float = 1.0,
-) -> FolderRectData:
-    folder_rect_data: FolderRectData = {
+def _build_root_container_layout(
+    graph: nx.DiGraph,
+    root_folder_nodes: Sequence[str],
+    root_folders: Sequence[str],
+    folder_layouts: Mapping[str, ContainerLayout],
+    node_layout_k: float,
+) -> ContainerLayout:
+    root_nodes_layout = _build_local_node_layout(graph, root_folder_nodes, node_layout_k)
+    root_child_sizes = [
+        (folder_name, folder_layouts[folder_name].width, folder_layouts[folder_name].height)
+        for folder_name in sorted(root_folders)
+    ]
+    packed_root_folders = _pack_boxes(
+        root_child_sizes,
+        gap_x=FOLDER_GRID_GAP_X,
+        gap_y=FOLDER_GRID_GAP_Y,
+    )
+    total_width = max(root_nodes_layout.width, packed_root_folders.width)
+    total_height = packed_root_folders.height + root_nodes_layout.height
+    has_root_folder_section = packed_root_folders.height > 0.0
+    has_root_node_section = root_nodes_layout.height > 0.0
+    root_section_gap = (
+        ROOT_SECTION_GAP if has_root_folder_section and has_root_node_section else 0.0
+    )
+    total_height += root_section_gap
+
+    folder_origin_x = (total_width - packed_root_folders.width) / 2.0
+    folder_origin_y = 0.0
+    node_origin_x = (total_width - root_nodes_layout.width) / 2.0
+    node_origin_y = packed_root_folders.height + root_section_gap
+    node_positions = {
+        node_id: (node_origin_x + local_x, node_origin_y + local_y)
+        for node_id, (local_x, local_y) in root_nodes_layout.positions.items()
+    }
+    child_origins = {
+        folder_name: (folder_origin_x + local_x, folder_origin_y + local_y)
+        for folder_name, (local_x, local_y) in packed_root_folders.origins.items()
+    }
+
+    return ContainerLayout(
+        width=total_width,
+        height=total_height,
+        node_positions=node_positions,
+        child_origins=child_origins,
+    )
+
+
+def _build_folder_rect_data() -> FolderRectData:
+    return {
         "x": [],
         "y": [],
+        "label_y": [],
         "width": [],
         "height": [],
         "name": [],
         "color": [],
     }
-    sorted_folders = sorted(
-        folder_to_nodes.keys(),
-        key=lambda folder_name: folder_name.count("/"),
-        reverse=True,
-    )
-
-    for folder_name in sorted_folders:
-        all_child_nodes = _get_folder_and_child_nodes(folder_name, folder_to_nodes, sorted_folders)
-        coords = [
-            final_positions[node_id]
-            for node_id in all_child_nodes
-            if node_id in final_positions
-        ]
-        if not coords:
-            continue
-
-        min_x = min(x_coord for x_coord, _ in coords) - padding
-        max_x = max(x_coord for x_coord, _ in coords) + padding
-        min_y = min(y_coord for _, y_coord in coords) - padding
-        max_y = max(y_coord for _, y_coord in coords) + padding
-
-        folder_rect_data["x"].append((min_x + max_x) / 2)
-        folder_rect_data["y"].append((min_y + max_y) / 2)
-        folder_rect_data["width"].append(max_x - min_x)
-        folder_rect_data["height"].append(max_y - min_y)
-        folder_rect_data["name"].append(folder_name.split("/")[-1])
-        folder_rect_data["color"].append("#E8E8E8")
-
-    return folder_rect_data
 
 
-def _add_root_folder_positions(
-    graph: nx.DiGraph,
-    root_folder_nodes: Sequence[str],
-    final_positions: dict[str, tuple[float, float]],
-    node_layout_k: float,
+def _append_folder_rect(
+    folder_rect_data: FolderRectData,
+    folder_name: str,
+    origin_x: float,
+    origin_y: float,
+    layout: ContainerLayout,
 ) -> None:
-    if not root_folder_nodes:
-        return
-
-    root_subgraph = graph.subgraph(root_folder_nodes)
-    root_positions = _normalize_layout_positions(
-        cast(
-            "Mapping[str, Sequence[float]]",
-            nx.spring_layout(
-                root_subgraph,
-                k=node_layout_k,
-                iterations=50,
-                seed=FREEZE_RANDOM_SEED,
-                scale=5,
-                center=(0, 0),
-            ),
-        )
+    folder_rect_data["x"].append(origin_x + layout.width / 2.0)
+    folder_rect_data["y"].append(origin_y + layout.height / 2.0)
+    folder_rect_data["label_y"].append(
+        origin_y + layout.height - FOLDER_PADDING_Y - FOLDER_LABEL_HEIGHT / 2.0
     )
-    final_positions.update(root_positions)
+    folder_rect_data["width"].append(layout.width)
+    folder_rect_data["height"].append(layout.height)
+    folder_rect_data["name"].append(folder_name.rsplit("/", maxsplit=1)[-1])
+    folder_rect_data["color"].append("#E8E8E8")
+
+
+def _assign_folder_positions(  # noqa: PLR0913
+    folder_name: str,
+    origin_x: float,
+    origin_y: float,
+    folder_layouts: Mapping[str, ContainerLayout],
+    folder_rect_data: FolderRectData,
+    final_positions: dict[str, tuple[float, float]],
+) -> None:
+    layout = folder_layouts[folder_name]
+    _append_folder_rect(folder_rect_data, folder_name, origin_x, origin_y, layout)
+
+    for node_id in sorted(layout.node_positions):
+        relative_x, relative_y = layout.node_positions[node_id]
+        final_positions[node_id] = (origin_x + relative_x, origin_y + relative_y)
+
+    for child_name in sorted(layout.child_origins):
+        child_origin_x, child_origin_y = layout.child_origins[child_name]
+        _assign_folder_positions(
+            child_name,
+            origin_x + child_origin_x,
+            origin_y + child_origin_y,
+            folder_layouts,
+            folder_rect_data,
+            final_positions,
+        )
 
 
 def _create_constrained_layout(
     graph: nx.DiGraph,
     *,
-    folder_layout_k: float = 2,
     node_layout_k: float = 0.5,
 ) -> tuple[dict[str, tuple[float, float]], FolderRectData]:
     folder_to_nodes, root_folder_nodes = _collect_folder_nodes(graph)
-    folder_graph = _build_folder_graph(folder_to_nodes)
-    folder_positions = _build_folder_positions(folder_graph, folder_layout_k)
-    final_positions = _place_nodes_within_folders(
-        graph,
+    root_folders, child_folders = _build_folder_hierarchy(folder_to_nodes)
+    folder_layouts: dict[str, ContainerLayout] = {}
+
+    for folder_name in sorted(
         folder_to_nodes,
-        folder_positions,
+        key=lambda name: (name.count("/"), name),
+        reverse=True,
+    ):
+        folder_layouts[folder_name] = _build_folder_container_layout(
+            graph,
+            folder_name,
+            folder_to_nodes,
+            child_folders,
+            node_layout_k,
+            folder_layouts,
+        )
+
+    root_layout = _build_root_container_layout(
+        graph,
+        root_folder_nodes,
+        root_folders,
+        folder_layouts,
         node_layout_k,
     )
-    folder_rect_data = _build_folder_rect_data(folder_to_nodes, final_positions)
-    _add_root_folder_positions(graph, root_folder_nodes, final_positions, node_layout_k)
-
+    final_positions = {
+        node_id: (
+            relative_x - root_layout.width / 2.0,
+            relative_y - root_layout.height / 2.0,
+        )
+        for node_id, (relative_x, relative_y) in root_layout.node_positions.items()
+    }
+    folder_rect_data = _build_folder_rect_data()
+    root_origin_x = -root_layout.width / 2.0
+    root_origin_y = -root_layout.height / 2.0
+    for folder_name in sorted(root_layout.child_origins):
+        child_origin_x, child_origin_y = root_layout.child_origins[folder_name]
+        _assign_folder_positions(
+            folder_name,
+            root_origin_x + child_origin_x,
+            root_origin_y + child_origin_y,
+            folder_layouts,
+            folder_rect_data,
+            final_positions,
+        )
     return final_positions, folder_rect_data
 
 
@@ -306,7 +581,7 @@ def _build_node_visual_data(graph: nx.DiGraph) -> dict[object, NodeVisualData]:
     degrees = dict(graph.degree())
     visual_data: dict[object, NodeVisualData] = {}
 
-    for node_id in list(graph.nodes()):
+    for node_id in sorted(graph.nodes(), key=str):
         node_data = graph.nodes[node_id]
         current_degree = degrees.get(node_id, 0)
         calculated_size = MIN_NODE_SIZE + current_degree * 10
@@ -334,9 +609,13 @@ def _copy_graph_with_visual_data(
     node_visual_data: Mapping[object, NodeVisualData],
 ) -> nx.DiGraph:
     graph_to_draw = nx.DiGraph()
-    for node_id, node_data in graph.nodes(data=True):
+    for node_id, node_data in sorted(graph.nodes(data=True), key=lambda item: str(item[0])):
         graph_to_draw.add_node(node_id, **dict(node_data))
-    for start_node, end_node in graph.edges():
+    sorted_edges = sorted(
+        graph.edges(),
+        key=lambda edge: (str(edge[0]), str(edge[1])),
+    )
+    for start_node, end_node in sorted_edges:
         graph_to_draw.add_edge(start_node, end_node)
     for node_id, visual_data in node_visual_data.items():
         graph_to_draw.nodes[node_id].update(visual_data)
@@ -387,7 +666,7 @@ def _create_bokeh_plot(folder_rect_data: FolderRectData) -> tuple[figure_model, 
 
     folder_labels = LabelSet(
         x="x",
-        y="y",
+        y="label_y",
         text="name",
         source=folder_source,
         text_font_size="12pt",
@@ -472,7 +751,11 @@ def _build_arrow_source_data(
         "end_y": [],
     }
 
-    for start_node, end_node in graph.edges():
+    sorted_edges = sorted(
+        graph.edges(),
+        key=lambda edge: (str(edge[0]), str(edge[1])),
+    )
+    for start_node, end_node in sorted_edges:
         start_coords = final_positions[str(start_node)]
         end_coords = final_positions[str(end_node)]
         arrow_source_data["start_x"].append(start_coords[0])

@@ -68,8 +68,8 @@ pytest = "*"
 [tool.netimport]
 ignored_dirs = ["venv", ".venv", "tests", "docs", "__pycache__", "node_modules", "migrations", ".git", ".hg"]
 ignored_files = ["setup.py", "manage.py"]
-ignore_stdlib = true
-ignore_external_lib = true
+ignore_stdlib = false
+ignore_external_lib = false
 ignored_nodes = []
 
 [tool.mypy]

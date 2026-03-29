@@ -21,10 +21,14 @@ def find_python_files(
 
     python_files: list[str] = []
     for root, dirs, files in os.walk(root_path, topdown=True):
-        dirs[:] = [directory_name for directory_name in dirs if directory_name not in ignored_dirs]
+        dirs[:] = sorted(
+            directory_name
+            for directory_name in dirs
+            if directory_name not in ignored_dirs
+        )
         python_files.extend(
             str(Path(root) / file_name)
-            for file_name in files
+            for file_name in sorted(files)
             if file_name.endswith(".py") and file_name not in ignored_files
         )
 

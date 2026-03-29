@@ -229,3 +229,44 @@ def test_build_dependency_graph_assigns_stable_folder_metadata_to_non_project_no
     assert graph.nodes["os"]["folder"] != str(caller_root)
     assert graph.nodes["requests"]["folder"] != str(caller_root)
     assert graph.nodes[".missing"]["folder"] != str(caller_root)
+
+
+def test_build_dependency_graph_is_deterministic_for_equivalent_input_orders(
+    tmp_path: Path,
+) -> None:
+    project_root = tmp_path / "project"
+    project_root.mkdir()
+
+    main_path = project_root / "main.py"
+    helper_path = project_root / "helper.py"
+    utils_path = project_root / "utils.py"
+
+    first_input = {
+        str(main_path): ["helper", "utils"],
+        str(helper_path): [],
+        str(utils_path): [],
+    }
+    second_input = {
+        str(utils_path): [],
+        str(helper_path): [],
+        str(main_path): ["utils", "helper"],
+    }
+    ignore_config = IgnoreConfigNode(
+        nodes=set(),
+        stdlib=False,
+        external_lib=False,
+    )
+
+    first_graph = build_dependency_graph(
+        file_imports_map=first_input,
+        project_root=str(project_root),
+        ignore=ignore_config,
+    )
+    second_graph = build_dependency_graph(
+        file_imports_map=second_input,
+        project_root=str(project_root),
+        ignore=ignore_config,
+    )
+
+    assert list(first_graph.nodes()) == list(second_graph.nodes())
+    assert list(first_graph.edges()) == list(second_graph.edges())

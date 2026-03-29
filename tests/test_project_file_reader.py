@@ -27,3 +27,4 @@ def test_find_python_files(tmp_path: Path) -> None:
     assert len(py_files) == 2
     assert str(project_root / "file1.py") in py_files
     assert str(sub_dir / "file3.py") in py_files
+    assert py_files == sorted(py_files)

@@ -24,7 +24,7 @@ class GraphVisualizer:
 def _render_bokeh(graph: nx.DiGraph, layout: str) -> str | None:
     draw_bokeh_graph = cast(
         "GraphRenderFunc",
-        importlib.import_module("netimport_lib.visualizer.bokeh_plotter_v2").draw_bokeh_graph,
+        importlib.import_module("netimport_lib.visualizer.bokeh_plotter").draw_bokeh_graph,
     )
 
     return draw_bokeh_graph(graph, layout)

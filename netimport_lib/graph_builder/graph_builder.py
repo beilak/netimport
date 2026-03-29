@@ -68,8 +68,8 @@ def _normalize_file_imports_map(
     file_imports_map: Mapping[str, Sequence[str]],
 ) -> dict[str, tuple[str, ...]]:
     return {
-        normalize_path(file_path): tuple(import_strings)
-        for file_path, import_strings in file_imports_map.items()
+        normalize_path(file_path): tuple(sorted(import_strings))
+        for file_path, import_strings in sorted(file_imports_map.items())
     }
 
 
@@ -78,7 +78,7 @@ def _add_project_file_nodes(
     project_files_normalized: set[str],
     ignore: IgnoreConfigNode,
 ) -> None:
-    for source_file_path in project_files_normalized:
+    for source_file_path in sorted(project_files_normalized):
         label = Path(source_file_path).name
         if label in ignore.nodes:
             continue
@@ -93,11 +93,11 @@ def _add_import_edges(
     project_files_normalized: set[str],
     ignore: IgnoreConfigNode,
 ) -> None:
-    for source_node_id, import_strings in file_imports_map.items():
+    for source_node_id, import_strings in sorted(file_imports_map.items()):
         if source_node_id not in graph:
             continue
 
-        for import_str in import_strings:
+        for import_str in sorted(import_strings):
             if not import_str:
                 continue
 

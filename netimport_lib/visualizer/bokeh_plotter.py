@@ -111,6 +111,32 @@ class ContainerLayout:
     child_origins: dict[str, tuple[float, float]]
 
 
+@dataclass(frozen=True, slots=True)
+class LayoutTuning:
+    """Adaptive spacing values for constrained layout."""
+
+    min_node_block_span: float
+    node_block_cell_span: float
+    node_layout_inset: float
+    folder_padding_x: float
+    folder_padding_y: float
+    folder_label_height: float
+    folder_section_gap: float
+    folder_grid_gap_x: float
+    folder_grid_gap_y: float
+    root_section_gap: float
+    min_folder_content_width: float
+    min_folder_content_height: float
+
+
+@dataclass(frozen=True, slots=True)
+class PlotDimensions:
+    """Pixel dimensions for the rendered Bokeh plot."""
+
+    width: int
+    height: int
+
+
 FREEZE_RANDOM_SEED: Final[int] = 42
 LABEL_PADDING: Final[float] = 20.0
 MIN_NODE_SIZE: Final[int] = 20
@@ -126,6 +152,11 @@ FOLDER_GRID_GAP_Y: Final[float] = 2.0
 ROOT_SECTION_GAP: Final[float] = 3.0
 MIN_FOLDER_CONTENT_WIDTH: Final[float] = 4.0
 MIN_FOLDER_CONTENT_HEIGHT: Final[float] = 3.0
+BASE_PLOT_WIDTH: Final[int] = 900
+BASE_PLOT_HEIGHT: Final[int] = 720
+MAX_PLOT_WIDTH: Final[int] = 2400
+MAX_PLOT_HEIGHT: Final[int] = 1800
+PLOT_PIXELS_PER_LAYOUT_UNIT: Final[float] = 24.0
 COLOR_MAP: Final[Mapping[str, str]] = MappingProxyType(
     {
         "project_file": "skyblue",
@@ -209,6 +240,39 @@ def _build_sorted_layout_subgraph(
     return subgraph
 
 
+def _clamp_float(value: float, minimum: float, maximum: float) -> float:
+    return max(minimum, min(value, maximum))
+
+
+def _build_layout_tuning(
+    graph: nx.DiGraph,
+    folder_to_nodes: Mapping[str, Sequence[str]],
+) -> LayoutTuning:
+    node_count = max(graph.number_of_nodes(), 1)
+    folder_count = max(len(folder_to_nodes), 1)
+    density_scale = 1.0 + min(1.0, math.log2(node_count + 1) / 6.0)
+    folder_scale = 1.0 + min(0.6, math.log2(folder_count + 1) / 7.0)
+    spacing_scale = max(density_scale, folder_scale)
+    node_scale = spacing_scale
+    gap_scale = 1.0 + (spacing_scale - 1.0) * 1.35
+    padding_scale = 1.0 + (spacing_scale - 1.0) * 0.7
+
+    return LayoutTuning(
+        min_node_block_span=MIN_NODE_BLOCK_SPAN * node_scale,
+        node_block_cell_span=NODE_BLOCK_CELL_SPAN * node_scale,
+        node_layout_inset=NODE_LAYOUT_INSET * (1.0 + (spacing_scale - 1.0) * 0.3),
+        folder_padding_x=FOLDER_PADDING_X * padding_scale,
+        folder_padding_y=FOLDER_PADDING_Y * padding_scale,
+        folder_label_height=FOLDER_LABEL_HEIGHT * padding_scale,
+        folder_section_gap=FOLDER_SECTION_GAP * gap_scale,
+        folder_grid_gap_x=FOLDER_GRID_GAP_X * gap_scale,
+        folder_grid_gap_y=FOLDER_GRID_GAP_Y * gap_scale,
+        root_section_gap=ROOT_SECTION_GAP * gap_scale,
+        min_folder_content_width=MIN_FOLDER_CONTENT_WIDTH * padding_scale,
+        min_folder_content_height=MIN_FOLDER_CONTENT_HEIGHT * padding_scale,
+    )
+
+
 def _scale_positions_to_block(
     raw_positions: Mapping[str, tuple[float, float]],
     *,
@@ -250,14 +314,15 @@ def _build_local_node_layout(
     graph: nx.DiGraph,
     node_ids: Sequence[str],
     node_layout_k: float,
+    layout_tuning: LayoutTuning,
 ) -> LocalNodeLayout:
     ordered_nodes = tuple(sorted(node_ids))
     if not ordered_nodes:
         return LocalNodeLayout(width=0.0, height=0.0, positions={})
 
     if len(ordered_nodes) == 1:
-        width = MIN_NODE_BLOCK_SPAN
-        height = MIN_NODE_BLOCK_SPAN
+        width = layout_tuning.min_node_block_span
+        height = layout_tuning.min_node_block_span
         return LocalNodeLayout(
             width=width,
             height=height,
@@ -266,8 +331,14 @@ def _build_local_node_layout(
 
     column_count = max(1, math.ceil(math.sqrt(len(ordered_nodes))))
     row_count = math.ceil(len(ordered_nodes) / column_count)
-    width = max(MIN_NODE_BLOCK_SPAN, float(column_count) * NODE_BLOCK_CELL_SPAN)
-    height = max(MIN_NODE_BLOCK_SPAN, float(row_count) * NODE_BLOCK_CELL_SPAN)
+    width = max(
+        layout_tuning.min_node_block_span,
+        float(column_count) * layout_tuning.node_block_cell_span,
+    )
+    height = max(
+        layout_tuning.min_node_block_span,
+        float(row_count) * layout_tuning.node_block_cell_span,
+    )
     subgraph = _build_sorted_layout_subgraph(graph, ordered_nodes)
     raw_positions = _normalize_layout_positions(
         cast(
@@ -288,7 +359,7 @@ def _build_local_node_layout(
             raw_positions,
             width=width,
             height=height,
-            inset=NODE_LAYOUT_INSET,
+            inset=layout_tuning.node_layout_inset,
         ),
     )
 
@@ -348,6 +419,21 @@ def _pack_boxes(
     return PackedBoxLayout(width=total_width, height=total_height, origins=origins)
 
 
+def _should_use_side_by_side_sections(
+    packed_children: PackedBoxLayout,
+    direct_nodes_layout: LocalNodeLayout,
+    layout_tuning: LayoutTuning,
+) -> bool:
+    if packed_children.width <= 0.0 or direct_nodes_layout.width <= 0.0:
+        return False
+
+    combined_area = (
+        packed_children.width * packed_children.height
+        + direct_nodes_layout.width * direct_nodes_layout.height
+    )
+    return combined_area >= (layout_tuning.node_block_cell_span ** 2) * 6.0
+
+
 def _build_folder_container_layout(  # noqa: PLR0913
     graph: nx.DiGraph,
     folder_name: str,
@@ -355,11 +441,13 @@ def _build_folder_container_layout(  # noqa: PLR0913
     child_folders: Mapping[str, Sequence[str]],
     node_layout_k: float,
     folder_layouts: dict[str, ContainerLayout],
+    layout_tuning: LayoutTuning,
 ) -> ContainerLayout:
     direct_nodes_layout = _build_local_node_layout(
         graph,
         folder_to_nodes.get(folder_name, ()),
         node_layout_k,
+        layout_tuning,
     )
     child_names = tuple(sorted(child_folders.get(folder_name, ())))
     child_box_sizes = [
@@ -368,31 +456,67 @@ def _build_folder_container_layout(  # noqa: PLR0913
     ]
     packed_children = _pack_boxes(
         child_box_sizes,
-        gap_x=FOLDER_GRID_GAP_X,
-        gap_y=FOLDER_GRID_GAP_Y,
+        gap_x=layout_tuning.folder_grid_gap_x,
+        gap_y=layout_tuning.folder_grid_gap_y,
     )
-    content_width = max(
-        MIN_FOLDER_CONTENT_WIDTH,
-        direct_nodes_layout.width,
-        packed_children.width,
+    use_side_by_side_sections = _should_use_side_by_side_sections(
+        packed_children,
+        direct_nodes_layout,
+        layout_tuning,
     )
-    sections_height = packed_children.height + direct_nodes_layout.height
-    if packed_children.height > 0.0 and direct_nodes_layout.height > 0.0:
-        sections_height += FOLDER_SECTION_GAP
-    content_height = max(MIN_FOLDER_CONTENT_HEIGHT, sections_height)
-    child_origin_x = FOLDER_PADDING_X + (content_width - packed_children.width) / 2.0
-    child_origin_y = FOLDER_PADDING_Y
-    direct_origin_x = FOLDER_PADDING_X + (content_width - direct_nodes_layout.width) / 2.0
     has_child_section = packed_children.height > 0.0
     has_direct_node_section = direct_nodes_layout.height > 0.0
     section_gap = (
-        FOLDER_SECTION_GAP if has_child_section and has_direct_node_section else 0.0
+        layout_tuning.folder_section_gap
+        if has_child_section and has_direct_node_section
+        else 0.0
     )
-    direct_origin_y = (
-        FOLDER_PADDING_Y
-        + packed_children.height
-        + section_gap
-    )
+    if use_side_by_side_sections:
+        content_width = max(
+            layout_tuning.min_folder_content_width,
+            packed_children.width + direct_nodes_layout.width + section_gap,
+        )
+        content_height = max(
+            layout_tuning.min_folder_content_height,
+            packed_children.height,
+            direct_nodes_layout.height,
+        )
+        child_origin_x = (
+            layout_tuning.folder_padding_x
+            + (content_width - packed_children.width - direct_nodes_layout.width - section_gap)
+            / 2.0
+        )
+        child_origin_y = (
+            layout_tuning.folder_padding_y
+            + (content_height - packed_children.height) / 2.0
+        )
+        direct_origin_x = child_origin_x + packed_children.width + section_gap
+        direct_origin_y = (
+            layout_tuning.folder_padding_y
+            + (content_height - direct_nodes_layout.height) / 2.0
+        )
+    else:
+        content_width = max(
+            layout_tuning.min_folder_content_width,
+            direct_nodes_layout.width,
+            packed_children.width,
+        )
+        sections_height = packed_children.height + direct_nodes_layout.height + section_gap
+        content_height = max(layout_tuning.min_folder_content_height, sections_height)
+        child_origin_x = (
+            layout_tuning.folder_padding_x
+            + (content_width - packed_children.width) / 2.0
+        )
+        child_origin_y = layout_tuning.folder_padding_y
+        direct_origin_x = (
+            layout_tuning.folder_padding_x
+            + (content_width - direct_nodes_layout.width) / 2.0
+        )
+        direct_origin_y = (
+            layout_tuning.folder_padding_y
+            + packed_children.height
+            + section_gap
+        )
     node_positions = {
         node_id: (direct_origin_x + local_x, direct_origin_y + local_y)
         for node_id, (local_x, local_y) in direct_nodes_layout.positions.items()
@@ -403,43 +527,66 @@ def _build_folder_container_layout(  # noqa: PLR0913
     }
 
     return ContainerLayout(
-        width=content_width + 2 * FOLDER_PADDING_X,
-        height=content_height + 2 * FOLDER_PADDING_Y + FOLDER_LABEL_HEIGHT,
+        width=content_width + 2 * layout_tuning.folder_padding_x,
+        height=(
+            content_height
+            + 2 * layout_tuning.folder_padding_y
+            + layout_tuning.folder_label_height
+        ),
         node_positions=node_positions,
         child_origins=child_origins,
     )
 
 
-def _build_root_container_layout(
+def _build_root_container_layout(  # noqa: PLR0913
     graph: nx.DiGraph,
     root_folder_nodes: Sequence[str],
     root_folders: Sequence[str],
     folder_layouts: Mapping[str, ContainerLayout],
     node_layout_k: float,
+    layout_tuning: LayoutTuning,
 ) -> ContainerLayout:
-    root_nodes_layout = _build_local_node_layout(graph, root_folder_nodes, node_layout_k)
+    root_nodes_layout = _build_local_node_layout(
+        graph,
+        root_folder_nodes,
+        node_layout_k,
+        layout_tuning,
+    )
     root_child_sizes = [
         (folder_name, folder_layouts[folder_name].width, folder_layouts[folder_name].height)
         for folder_name in sorted(root_folders)
     ]
     packed_root_folders = _pack_boxes(
         root_child_sizes,
-        gap_x=FOLDER_GRID_GAP_X,
-        gap_y=FOLDER_GRID_GAP_Y,
+        gap_x=layout_tuning.folder_grid_gap_x,
+        gap_y=layout_tuning.folder_grid_gap_y,
     )
-    total_width = max(root_nodes_layout.width, packed_root_folders.width)
-    total_height = packed_root_folders.height + root_nodes_layout.height
+    use_side_by_side_sections = _should_use_side_by_side_sections(
+        packed_root_folders,
+        root_nodes_layout,
+        layout_tuning,
+    )
     has_root_folder_section = packed_root_folders.height > 0.0
     has_root_node_section = root_nodes_layout.height > 0.0
     root_section_gap = (
-        ROOT_SECTION_GAP if has_root_folder_section and has_root_node_section else 0.0
+        layout_tuning.root_section_gap
+        if has_root_folder_section and has_root_node_section
+        else 0.0
     )
-    total_height += root_section_gap
-
-    folder_origin_x = (total_width - packed_root_folders.width) / 2.0
-    folder_origin_y = 0.0
-    node_origin_x = (total_width - root_nodes_layout.width) / 2.0
-    node_origin_y = packed_root_folders.height + root_section_gap
+    if use_side_by_side_sections:
+        total_width = packed_root_folders.width + root_nodes_layout.width + root_section_gap
+        total_height = max(packed_root_folders.height, root_nodes_layout.height)
+        folder_origin_x = 0.0
+        folder_origin_y = (total_height - packed_root_folders.height) / 2.0
+        node_origin_x = packed_root_folders.width + root_section_gap
+        node_origin_y = (total_height - root_nodes_layout.height) / 2.0
+    else:
+        total_width = max(root_nodes_layout.width, packed_root_folders.width)
+        total_height = packed_root_folders.height + root_nodes_layout.height + root_section_gap
+        folder_origin_x = (total_width - packed_root_folders.width) / 2.0
+        folder_origin_y = 0.0
+        node_origin_x = (total_width - root_nodes_layout.width) / 2.0
+        node_origin_y = packed_root_folders.height + root_section_gap
     node_positions = {
         node_id: (node_origin_x + local_x, node_origin_y + local_y)
         for node_id, (local_x, local_y) in root_nodes_layout.positions.items()
@@ -469,17 +616,21 @@ def _build_folder_rect_data() -> FolderRectData:
     }
 
 
-def _append_folder_rect(
+def _append_folder_rect(  # noqa: PLR0913
     folder_rect_data: FolderRectData,
     folder_name: str,
     origin_x: float,
     origin_y: float,
     layout: ContainerLayout,
+    layout_tuning: LayoutTuning,
 ) -> None:
     folder_rect_data["x"].append(origin_x + layout.width / 2.0)
     folder_rect_data["y"].append(origin_y + layout.height / 2.0)
     folder_rect_data["label_y"].append(
-        origin_y + layout.height - FOLDER_PADDING_Y - FOLDER_LABEL_HEIGHT / 2.0
+        origin_y
+        + layout.height
+        - layout_tuning.folder_padding_y
+        - layout_tuning.folder_label_height / 2.0
     )
     folder_rect_data["width"].append(layout.width)
     folder_rect_data["height"].append(layout.height)
@@ -494,9 +645,17 @@ def _assign_folder_positions(  # noqa: PLR0913
     folder_layouts: Mapping[str, ContainerLayout],
     folder_rect_data: FolderRectData,
     final_positions: dict[str, tuple[float, float]],
+    layout_tuning: LayoutTuning,
 ) -> None:
     layout = folder_layouts[folder_name]
-    _append_folder_rect(folder_rect_data, folder_name, origin_x, origin_y, layout)
+    _append_folder_rect(
+        folder_rect_data,
+        folder_name,
+        origin_x,
+        origin_y,
+        layout,
+        layout_tuning,
+    )
 
     for node_id in sorted(layout.node_positions):
         relative_x, relative_y = layout.node_positions[node_id]
@@ -511,6 +670,7 @@ def _assign_folder_positions(  # noqa: PLR0913
             folder_layouts,
             folder_rect_data,
             final_positions,
+            layout_tuning,
         )
 
 
@@ -520,6 +680,7 @@ def _create_constrained_layout(
     node_layout_k: float = 0.5,
 ) -> tuple[dict[str, tuple[float, float]], FolderRectData]:
     folder_to_nodes, root_folder_nodes = _collect_folder_nodes(graph)
+    layout_tuning = _build_layout_tuning(graph, folder_to_nodes)
     root_folders, child_folders = _build_folder_hierarchy(folder_to_nodes)
     folder_layouts: dict[str, ContainerLayout] = {}
 
@@ -535,6 +696,7 @@ def _create_constrained_layout(
             child_folders,
             node_layout_k,
             folder_layouts,
+            layout_tuning,
         )
 
     root_layout = _build_root_container_layout(
@@ -543,6 +705,7 @@ def _create_constrained_layout(
         root_folders,
         folder_layouts,
         node_layout_k,
+        layout_tuning,
     )
     final_positions = {
         node_id: (
@@ -563,8 +726,80 @@ def _create_constrained_layout(
             folder_layouts,
             folder_rect_data,
             final_positions,
+            layout_tuning,
         )
     return final_positions, folder_rect_data
+
+
+def _measure_layout_bounds(
+    final_positions: Mapping[str, tuple[float, float]],
+    folder_rect_data: FolderRectData,
+) -> tuple[float, float]:
+    min_x: float | None = None
+    max_x: float | None = None
+    min_y: float | None = None
+    max_y: float | None = None
+
+    for x_coord, y_coord in final_positions.values():
+        min_x = x_coord if min_x is None else min(min_x, x_coord)
+        max_x = x_coord if max_x is None else max(max_x, x_coord)
+        min_y = y_coord if min_y is None else min(min_y, y_coord)
+        max_y = y_coord if max_y is None else max(max_y, y_coord)
+
+    for center_x, center_y, width, height in zip(
+        folder_rect_data["x"],
+        folder_rect_data["y"],
+        folder_rect_data["width"],
+        folder_rect_data["height"],
+        strict=True,
+    ):
+        rect_min_x = center_x - width / 2.0
+        rect_max_x = center_x + width / 2.0
+        rect_min_y = center_y - height / 2.0
+        rect_max_y = center_y + height / 2.0
+        min_x = rect_min_x if min_x is None else min(min_x, rect_min_x)
+        max_x = rect_max_x if max_x is None else max(max_x, rect_max_x)
+        min_y = rect_min_y if min_y is None else min(min_y, rect_min_y)
+        max_y = rect_max_y if max_y is None else max(max_y, rect_max_y)
+
+    if min_x is None or max_x is None or min_y is None or max_y is None:
+        return (0.0, 0.0)
+
+    return (max_x - min_x, max_y - min_y)
+
+
+def _build_plot_dimensions(render_data: PreparedBokehRender) -> PlotDimensions:
+    layout_width, layout_height = _measure_layout_bounds(
+        render_data.final_positions,
+        render_data.folder_rect_data,
+    )
+    node_count = len(render_data.final_positions)
+    folder_count = len(render_data.folder_rect_data["name"])
+    complexity_width = (
+        BASE_PLOT_WIDTH
+        + max(node_count - 12, 0) * 28
+        + max(folder_count - 4, 0) * 120
+    )
+    complexity_height = (
+        BASE_PLOT_HEIGHT
+        + max(node_count - 12, 0) * 20
+        + max(folder_count - 4, 0) * 90
+    )
+    width = math.ceil(
+        _clamp_float(
+            max(layout_width * PLOT_PIXELS_PER_LAYOUT_UNIT, float(complexity_width)),
+            BASE_PLOT_WIDTH,
+            MAX_PLOT_WIDTH,
+        )
+    )
+    height = math.ceil(
+        _clamp_float(
+            max(layout_height * PLOT_PIXELS_PER_LAYOUT_UNIT, float(complexity_height)),
+            BASE_PLOT_HEIGHT,
+            MAX_PLOT_HEIGHT,
+        )
+    )
+    return PlotDimensions(width=width, height=height)
 
 
 def _build_bokeh_layout(
@@ -631,10 +866,14 @@ def _to_int(value: object) -> int:
     return 0
 
 
-def _create_bokeh_plot(folder_rect_data: FolderRectData) -> tuple[figure_model, ColumnDataSource]:
+def _create_bokeh_plot(
+    folder_rect_data: FolderRectData,
+    plot_dimensions: PlotDimensions,
+) -> tuple[figure_model, ColumnDataSource]:
     plot = figure_model(title="Interactive dependency graph")
-    plot.sizing_mode = "scale_both"
     plot.output_backend = "webgl"
+    plot.width = plot_dimensions.width
+    plot.height = plot_dimensions.height
 
     pan_tool = PanTool()
     hover_tool = HoverTool()
@@ -904,7 +1143,10 @@ def draw_bokeh_graph(graph: nx.DiGraph, layout: str) -> str | None:
     """Render a dependency graph with Bokeh."""
     render_data = prepare_bokeh_render(graph, layout)
     graph_to_draw = _copy_graph_with_visual_data(graph, render_data.node_visual_data)
-    plot, _folder_source = _create_bokeh_plot(render_data.folder_rect_data)
+    plot, _folder_source = _create_bokeh_plot(
+        render_data.folder_rect_data,
+        _build_plot_dimensions(render_data),
+    )
     graph_renderer = from_networkx(
         graph_to_draw,
         cast("dict[int | str, Sequence[float]]", render_data.final_positions),

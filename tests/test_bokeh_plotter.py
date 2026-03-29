@@ -1,3 +1,4 @@
+import math
 from pathlib import Path
 from typing import TYPE_CHECKING, cast
 
@@ -106,6 +107,36 @@ def _build_sibling_folder_graph() -> nx.DiGraph:
     graph.add_edge("alpha/a.py", "alpha/b.py")
     graph.add_edge("alpha/b.py", "beta/c.py")
     graph.add_edge("beta/c.py", "beta/d.py")
+
+    return graph
+
+
+def _build_single_folder_graph(node_count: int) -> nx.DiGraph:
+    graph = nx.DiGraph()
+    graph.add_node(
+        "root.py",
+        label="root.py",
+        folder="",
+        is_root_folder=True,
+        type="project_file",
+        in_degree=0,
+        out_degree=1 if node_count > 0 else 0,
+        total_degree=1 if node_count > 0 else 0,
+    )
+    previous_node_id = "root.py"
+    for index in range(node_count):
+        node_id = f"pkg/node_{index}.py"
+        graph.add_node(
+            node_id,
+            label=f"node_{index}.py",
+            folder="pkg",
+            type="project_file",
+            in_degree=1,
+            out_degree=1 if index < node_count - 1 else 0,
+            total_degree=2 if 0 < index < node_count - 1 else 1,
+        )
+        graph.add_edge(previous_node_id, node_id)
+        previous_node_id = node_id
 
     return graph
 
@@ -354,3 +385,35 @@ def test_prepare_bokeh_render_separates_sibling_folder_boxes() -> None:
     rect_map = _build_rect_map(render_data.folder_rect_data)
 
     assert not _rects_overlap(rect_map["alpha"], rect_map["beta"])
+
+
+def test_prepare_bokeh_render_expands_single_folder_geometry_for_large_graphs() -> None:
+    small_graph = _build_single_folder_graph(4)
+    large_graph = _build_single_folder_graph(16)
+    small_render = bokeh_plotter.prepare_bokeh_render(small_graph, "constrained")
+    large_render = bokeh_plotter.prepare_bokeh_render(large_graph, "constrained")
+    small_rect = _build_rect_map(small_render.folder_rect_data)["pkg"]
+    large_rect = _build_rect_map(large_render.folder_rect_data)["pkg"]
+
+    assert large_rect[2] / math.sqrt(16) > small_rect[2] / math.sqrt(4)
+
+
+def test_draw_bokeh_graph_uses_larger_canvas_for_large_graphs(
+    monkeypatch: MonkeyPatch,
+) -> None:
+    shown_plots: list[object] = []
+
+    monkeypatch.setattr(bokeh_plotter, "_present_plot", shown_plots.append)
+
+    bokeh_plotter.draw_bokeh_graph(_build_single_folder_graph(4), "constrained")
+    bokeh_plotter.draw_bokeh_graph(_build_single_folder_graph(16), "constrained")
+
+    small_plot = cast("figure_model", shown_plots[0])
+    large_plot = cast("figure_model", shown_plots[1])
+
+    assert large_plot.width is not None
+    assert small_plot.width is not None
+    assert large_plot.height is not None
+    assert small_plot.height is not None
+    assert large_plot.width > small_plot.width
+    assert large_plot.height > small_plot.height

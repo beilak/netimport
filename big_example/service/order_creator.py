@@ -1,6 +1,8 @@
 import datetime
 import typing
 import typing as tp
+import numpy, networkx
+
 
 from big_example.domine.order import Order
 
@@ -18,5 +20,6 @@ class OrderCreator:
             id=0, customer_id=customer_id, order_date=order_date, status=status, order_item_ids=order_item_ids
         )
         self._order_repository.save(new_order)
+        print(numpy, networkx)
 
         return new_order

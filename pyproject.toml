@@ -1,6 +1,6 @@
 [project]
 name = "netimport"
-version = "0.0.8"
+version = "0.1.0"
 description = "Static analysis CLI for Python import graphs and dependency summaries"
 authors = [
     { name = "Beilak Aliev", email = "beilak.aliev@gmail.com" },

@@ -18,7 +18,7 @@ Pull Requests are the best way to propose changes to the codebase. We actively w
 2.  If you've added code that should be tested, add tests.
 3.  If you've changed APIs, update the documentation.
 4.  Ensure the test suite passes.
-5.  Make sure your code lints.
+5.  Make sure your code passes both `ruff` and `wemake-python-styleguide`.
 6.  Issue that pull request!
 
 ## Any contributions you make will be under the MIT Software License
@@ -46,6 +46,7 @@ People *love* thorough bug reports. I'm not even kidding.
 ## Use a Consistent Coding Style
 
 We use `ruff` to format our code. Please run `poetry run ruff format .` before committing your changes.
+We enforce `wemake-python-styleguide` via `flake8` with no inline waivers for WPS checks. Please run `poetry run flake8 netimport_lib tests` before committing your changes.
 We also use `mypy` for static type checking. Please run `poetry run mypy .` to check for type errors.
 We also use `bandit` for security-focused static analysis. Please run `poetry run bandit -c pyproject.toml --severity-level all --confidence-level all --ignore-nosec -r netimport_lib` before submitting changes that touch production code.
 
@@ -67,7 +68,7 @@ poetry run pytest
 When you're ready to submit a pull request, please make sure you have done the following:
 
 1.  Run the test suite and ensure all tests pass.
-2.  Run the linter, type checker, and security scanner and ensure there are no errors.
+2.  Run `ruff`, `wemake-python-styleguide`, `mypy`, and `bandit` and ensure there are no errors.
 3.  Update the documentation if you have changed any APIs.
 4.  Write a clear and descriptive pull request message.
 

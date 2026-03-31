@@ -63,6 +63,7 @@ mypy = "*"
 ruff = "*"
 pytest = "*"
 bandit = {extras = ["toml"], version = "^1.9.4"}
+wemake-python-styleguide = {version = "1.6.1", python = ">=3.10,<4.0"}
 
 [tool.netimport]
 ignored_dirs = ["venv", ".venv", "tests", "docs", "__pycache__", "node_modules", "migrations", ".git", ".hg"]

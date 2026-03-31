@@ -1,4 +1,5 @@
 import math
+import webbrowser
 from pathlib import Path
 from typing import TYPE_CHECKING, cast
 
@@ -468,6 +469,138 @@ def test_draw_bokeh_graph_returns_no_message_when_auto_open_succeeds(
     message = bokeh_plotter.draw_bokeh_graph(_build_sample_graph(), "constrained")
 
     assert message is None
+
+
+def test_draw_bokeh_graph_uses_browser_controller_for_generated_html(
+    monkeypatch: MonkeyPatch,
+    tmp_path: Path,
+) -> None:
+    output_path = tmp_path / f"{bokeh_plotter.BOKEH_OUTPUT_PREFIX}graph.html"
+    output_path.write_text("<html></html>", encoding="utf-8")
+    calls: list[tuple[str, int, bool]] = []
+
+    class RecordingController:
+        def open(self, url: str, new: int, autoraise: bool) -> bool:
+            calls.append((url, new, autoraise))
+            return True
+
+    def _controller_factory(browser: str | None = None) -> RecordingController:
+        del browser
+        return RecordingController()
+
+    monkeypatch.setattr(bokeh_plotter, "_save_plot", lambda _plot: output_path)
+    monkeypatch.setattr(
+        bokeh_plotter,
+        "get_browser_controller",
+        _controller_factory,
+    )
+
+    message = bokeh_plotter.draw_bokeh_graph(_build_sample_graph(), "constrained")
+
+    assert message is None
+    assert calls == [(output_path.resolve().as_uri(), 2, True)]
+
+
+def test_draw_bokeh_graph_uses_webbrowser_module_controller_on_macos(
+    monkeypatch: MonkeyPatch,
+    tmp_path: Path,
+) -> None:
+    output_path = tmp_path / f"{bokeh_plotter.BOKEH_OUTPUT_PREFIX}graph.html"
+    output_path.write_text("<html></html>", encoding="utf-8")
+    calls: list[tuple[str, int, bool]] = []
+
+    def _recording_open(url: str, new: int, autoraise: bool) -> bool:
+        calls.append((url, new, autoraise))
+        return True
+
+    def _webbrowser_controller(browser: str | None = None) -> object:
+        del browser
+        return webbrowser
+
+    monkeypatch.setattr(bokeh_plotter, "_save_plot", lambda _plot: output_path)
+    monkeypatch.setattr(
+        bokeh_plotter,
+        "get_browser_controller",
+        _webbrowser_controller,
+    )
+    monkeypatch.setattr(webbrowser, "open", _recording_open)
+
+    message = bokeh_plotter.draw_bokeh_graph(_build_sample_graph(), "constrained")
+
+    assert message is None
+    assert calls == [(output_path.resolve().as_uri(), 2, True)]
+
+
+def test_draw_bokeh_graph_returns_manual_message_for_output_path_outside_generated_html_contract(
+    monkeypatch: MonkeyPatch,
+    tmp_path: Path,
+) -> None:
+    unexpected_output_path = tmp_path / "custom-report.txt"
+    unexpected_output_path.write_text("not html", encoding="utf-8")
+    controller_requested = False
+
+    def _unexpected_controller(browser: str | None = None) -> object:
+        del browser
+        nonlocal controller_requested
+        controller_requested = True
+        return object()
+
+    monkeypatch.setattr(
+        bokeh_plotter,
+        "get_browser_controller",
+        _unexpected_controller,
+    )
+
+    monkeypatch.setattr(
+        bokeh_plotter,
+        "_save_plot",
+        lambda _plot: unexpected_output_path,
+    )
+
+    message = bokeh_plotter.draw_bokeh_graph(_build_sample_graph(), "constrained")
+
+    assert message == (
+        "Interactive dependency graph saved to "
+        f"{unexpected_output_path}. Automatic browser launch is unavailable in this environment; "
+        "open the file manually."
+    )
+    assert controller_requested is False
+
+
+def test_draw_bokeh_graph_returns_manual_message_for_known_unreliable_controller(
+    monkeypatch: MonkeyPatch,
+    tmp_path: Path,
+) -> None:
+    output_path = tmp_path / f"{bokeh_plotter.BOKEH_OUTPUT_PREFIX}graph.html"
+    output_path.write_text("<html></html>", encoding="utf-8")
+
+    class MacOSXOSAScript:
+        def __init__(self) -> None:
+            self.open_calls = 0
+
+        def open(self, url: str, new: int, autoraise: bool) -> bool:
+            del url, new, autoraise
+            self.open_calls += 1
+            return True
+
+    def _controller_factory(browser: str | None = None) -> MacOSXOSAScript:
+        del browser
+        return MacOSXOSAScript()
+
+    monkeypatch.setattr(bokeh_plotter, "_save_plot", lambda _plot: output_path)
+    monkeypatch.setattr(
+        bokeh_plotter,
+        "get_browser_controller",
+        _controller_factory,
+    )
+
+    message = bokeh_plotter.draw_bokeh_graph(_build_sample_graph(), "constrained")
+
+    assert message == (
+        "Interactive dependency graph saved to "
+        f"{output_path}. Automatic browser launch is unavailable in this environment; "
+        "open the file manually."
+    )
 
 
 def test_prepare_bokeh_render_is_deterministic_for_equivalent_graph_orders() -> None:

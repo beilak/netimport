@@ -1,10 +1,6 @@
 """Bokeh-based graph rendering."""
 
 import math
-import os
-import shutil
-import subprocess
-import sys
 import tempfile
 import webbrowser
 from collections import defaultdict
@@ -1396,55 +1392,37 @@ def _save_plot(plot: figure_model) -> Path:
     return output_path
 
 
-def _run_open_command(command: Sequence[str]) -> bool:
+def _build_auto_open_uri(output_path: Path) -> str | None:
+    """Return a safe file URI for an auto-openable generated plot."""
     try:
-        completed_process = subprocess.run(  # noqa: S603
-            command,
-            check=False,
-            stdout=subprocess.DEVNULL,
-            stderr=subprocess.DEVNULL,
-        )
+        resolved_output_path = output_path.resolve(strict=True)
     except OSError:
-        return False
+        return None
 
-    return completed_process.returncode == 0
+    if not resolved_output_path.is_file():
+        return None
+    if not resolved_output_path.name.startswith(BOKEH_OUTPUT_PREFIX):
+        return None
+    if resolved_output_path.suffix.lower() != BOKEH_OUTPUT_SUFFIX:
+        return None
 
-
-def _open_with_platform_command(output_path: Path) -> bool:
-    if sys.platform == "darwin":
-        return _run_open_command(("open", str(output_path)))
-
-    if sys.platform.startswith("linux"):
-        opener = shutil.which("xdg-open")
-        if opener is None:
-            return False
-        return _run_open_command((opener, str(output_path)))
-
-    if os.name == "nt":
-        try:
-            os.startfile(str(output_path))  # noqa: S606
-        except OSError:
-            return False
-        return True
-
-    return False
+    return resolved_output_path.as_uri()
 
 
 def _should_skip_auto_open(controller: object) -> bool:
-    if controller is webbrowser and sys.platform == "darwin":
-        return True
     return controller.__class__.__name__ in SKIPPED_AUTO_OPEN_CONTROLLER_NAMES
 
 
 def _open_saved_plot(output_path: Path) -> bool:
-    if _open_with_platform_command(output_path):
-        return True
+    output_uri = _build_auto_open_uri(output_path)
+    if output_uri is None:
+        return False
 
     try:
         controller = get_browser_controller(browser=None)
         if _should_skip_auto_open(controller):
             return False
-        return bool(controller.open(output_path.as_uri(), new=2, autoraise=True))
+        return bool(controller.open(output_uri, new=2, autoraise=True))
     except (OSError, webbrowser.Error):
         return False
 

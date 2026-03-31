@@ -42,7 +42,7 @@ def normalize_path(path: str, project_root: str | None = None) -> str:
         try:
             return str(abs_path.relative_to(abs_project_root))
         except ValueError:
-            pass
+            return str(abs_path)
 
     return str(abs_path)
 

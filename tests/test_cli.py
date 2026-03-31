@@ -272,13 +272,7 @@ def test_cli_uses_bokeh_default_layout_when_layout_is_omitted(
                 ("constrained",),
                 "constrained",
                 visualizer_calls,
-            ),
-            "mpl": _build_recording_visualizer(
-                "mpl",
-                ("spring", "circular"),
-                "spring",
-                visualizer_calls,
-            ),
+            )
         },
     )
     monkeypatch.setattr(cli, "load_config", _default_loaded_config)
@@ -288,44 +282,6 @@ def test_cli_uses_bokeh_default_layout_when_layout_is_omitted(
 
     assert result.exit_code == 0
     assert visualizer_calls == [("bokeh", "constrained")]
-
-
-def test_cli_uses_mpl_default_layout_when_layout_is_omitted(
-    monkeypatch: MonkeyPatch,
-    tmp_path: Path,
-) -> None:
-    project_root = tmp_path / "sample_project"
-    project_root.mkdir()
-
-    (project_root / "main.py").write_text("import helper\n", encoding="utf-8")
-    (project_root / "helper.py").write_text("", encoding="utf-8")
-
-    visualizer_calls: list[tuple[str, str]] = []
-    monkeypatch.setattr(
-        cli,
-        "GRAPH_VISUALIZERS",
-        {
-            "bokeh": _build_recording_visualizer(
-                "bokeh",
-                ("constrained",),
-                "constrained",
-                visualizer_calls,
-            ),
-            "mpl": _build_recording_visualizer(
-                "mpl",
-                ("spring", "circular"),
-                "spring",
-                visualizer_calls,
-            ),
-        },
-    )
-    monkeypatch.setattr(cli, "load_config", _default_loaded_config)
-
-    runner: Final[CliRunner] = CliRunner()
-    result = runner.invoke(cli.main, [str(project_root), "--show-graph", "mpl"])
-
-    assert result.exit_code == 0
-    assert visualizer_calls == [("mpl", "spring")]
 
 
 def test_cli_accepts_supported_backend_and_layout_combination(
@@ -348,13 +304,7 @@ def test_cli_accepts_supported_backend_and_layout_combination(
                 ("constrained",),
                 "constrained",
                 visualizer_calls,
-            ),
-            "mpl": _build_recording_visualizer(
-                "mpl",
-                ("spring", "circular"),
-                "spring",
-                visualizer_calls,
-            ),
+            )
         },
     )
     monkeypatch.setattr(cli, "load_config", _default_loaded_config)
@@ -362,11 +312,11 @@ def test_cli_accepts_supported_backend_and_layout_combination(
     runner: Final[CliRunner] = CliRunner()
     result = runner.invoke(
         cli.main,
-        [str(project_root), "--show-graph", "mpl", "--layout", "circular"],
+        [str(project_root), "--show-graph", "bokeh", "--layout", "constrained"],
     )
 
     assert result.exit_code == 0
-    assert visualizer_calls == [("mpl", "circular")]
+    assert visualizer_calls == [("bokeh", "constrained")]
 
 
 def test_cli_prints_visualizer_message(monkeypatch: MonkeyPatch, tmp_path: Path) -> None:
@@ -445,8 +395,8 @@ def test_cli_rejects_unsupported_backend_and_layout_combination(tmp_path: Path) 
     )
 
     assert result.exit_code != 0
-    assert "Layout 'spring' is not supported by the 'bokeh' backend" in result.output
-    assert "Supported layouts: constrained." in result.output
+    assert "Invalid value for '--layout'" in result.output
+    assert "'spring' is not 'constrained'" in result.output
 
 
 def test_cli_help_lists_only_supported_visualizers_and_layouts() -> None:
@@ -455,8 +405,8 @@ def test_cli_help_lists_only_supported_visualizers_and_layouts() -> None:
 
     assert result.exit_code == 0
     assert "--config FILE" in result.output
-    assert "--show-graph [bokeh|mpl]" in result.output
-    assert "--layout [constrained|spring|circular|shell|planar_layout]" in result.output
+    assert "--show-graph [bokeh]" in result.output
+    assert "--layout [constrained]" in result.output
     assert "--summary-format [text|json]" in result.output
     assert "dot" not in result.output
     assert "neato" not in result.output

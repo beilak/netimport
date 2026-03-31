@@ -26,7 +26,7 @@ Remove `--no-show-graph` if you want to open the graph visualization instead of 
 
 *   **Import Analysis:** Recursively scans the specified project directory for Python files and parses their `import` statements.
 *   **Dependency Graph Construction:** Creates a directed graph where nodes represent project modules/packages, as well as external and standard libraries. Edges depict the imports between them.
-*   **Graph Visualization:** Supports an interactive Bokeh view and a static Matplotlib view with explicit backend/layout compatibility.
+*   **Graph Visualization:** Supports an interactive Bokeh view with a constrained layout tuned for dependency graphs.
 *   **Console Summary:** Prints a deterministic text report with project-level counts and coupling tables.
 *   **Configuration via CLI and TOML files:** Supports CLI overrides plus config from `[tool.netimport]` in `pyproject.toml`, `.netimport.toml`, or an explicit `--config` TOML file.
 *   **Dependency Type Identification:** Distinguishes imports of internal project modules, Python standard libraries, and external third-party dependencies.
@@ -45,7 +45,7 @@ NetImport currently supports:
 
 *   Static analysis of Python source trees based on AST-parsed `import` statements.
 *   Deterministic console summaries for headless runs and CI-oriented inspection.
-*   Explicit visualizer backend/layout combinations documented in the CLI and README.
+*   Interactive Bokeh visualization with the supported constrained layout documented in the CLI and README.
 *   Configuration from `[tool.netimport]` in `pyproject.toml`, `.netimport.toml`, explicit `--config` files, and CLI overrides.
 
 ## Installation
@@ -74,7 +74,7 @@ netimport [OPTIONS] <PROJECT_PATH>
 
 Path to the root directory of the Python project to analyze.
 
-`--layout [constrained|spring|circular|shell|planar_layout]`
+`--layout [constrained]`
 
 Choose a layout name for the selected graph backend. If omitted, NetImport uses the backend default.
 
@@ -82,14 +82,13 @@ Choose a layout name for the selected graph backend. If omitted, NetImport uses 
 
 Load an explicit TOML config file and apply it after project config has been loaded from the analyzed project. The file may either contain top-level NetImport keys or a `[tool.netimport]` section.
 
-`--show-graph [bokeh|mpl]`
+`--show-graph [bokeh]`
 
 Select the visualization backend. Current default is `bokeh`.
 
 Supported backend/layout combinations:
 
 - `bokeh`: `constrained` (default)
-- `mpl`: `spring` (default), `circular`, `shell`, `planar_layout`
 
 Unsupported combinations are rejected with a clear CLI error instead of silently falling back.
 
@@ -155,7 +154,7 @@ poetry run netimport example
 
 This is equivalent to `--show-graph bokeh --layout constrained`.
 
-Explicit Bokeh mode
+Explicit interactive mode
 
 Use this when you want to call the default interactive mode explicitly in scripts, docs, or manual checks.
 
@@ -164,38 +163,6 @@ poetry run netimport example --show-graph bokeh --layout constrained
 ```
 
 This opens the Bokeh visualizer with the `constrained` layout.
-
-Matplotlib spring mode
-
-Use this as the most universal static Matplotlib layout. It is the safest choice when you want a readable static graph for general-purpose inspection.
-
-```bash
-poetry run netimport example --show-graph mpl --layout spring
-```
-
-Matplotlib circular mode
-
-Use this when you want a simple ring-like layout that is easy to scan on small or medium graphs.
-
-```bash
-poetry run netimport example --show-graph mpl --layout circular
-```
-
-Matplotlib shell mode
-
-Use this when you want a layered visual structure with nodes arranged in shells.
-
-```bash
-poetry run netimport example --show-graph mpl --layout shell
-```
-
-Matplotlib planar mode
-
-Use this only when a planar-style view is useful for the current graph. For dense or non-planar dependency graphs, this mode may be less practical than `spring`.
-
-```bash
-poetry run netimport example --show-graph mpl --layout planar_layout
-```
 
 Graph plus console summary
 

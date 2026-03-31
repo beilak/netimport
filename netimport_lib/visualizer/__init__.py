@@ -30,21 +30,6 @@ def _render_bokeh(graph: nx.DiGraph, layout: str) -> str | None:
     return draw_bokeh_graph(graph, layout)
 
 
-def _render_mpl(graph: nx.DiGraph, layout: str) -> str | None:
-    draw_graph_mpl = cast(
-        "GraphRenderFunc",
-        importlib.import_module("netimport_lib.visualizer.mpl_plotter").draw_graph_mpl,
-    )
-
-    return draw_graph_mpl(graph, layout)
-
-
-MPL_LAYOUTS: Final[tuple[str, ...]] = (
-    "spring",
-    "circular",
-    "shell",
-    "planar_layout",
-)
 BOKEH_LAYOUTS: Final[tuple[str, ...]] = ("constrained",)
 GRAPH_VISUALIZERS: Final[dict[str, GraphVisualizer]] = {
     "bokeh": GraphVisualizer(
@@ -52,12 +37,6 @@ GRAPH_VISUALIZERS: Final[dict[str, GraphVisualizer]] = {
         render=_render_bokeh,
         supported_layouts=BOKEH_LAYOUTS,
         default_layout="constrained",
-    ),
-    "mpl": GraphVisualizer(
-        name="mpl",
-        render=_render_mpl,
-        supported_layouts=MPL_LAYOUTS,
-        default_layout="spring",
     ),
 }
 DEFAULT_VISUALIZER: Final[str] = "bokeh"
@@ -76,6 +55,5 @@ __all__ = [
     "GRAPH_LAYOUT_CHOICES",
     "GRAPH_VISUALIZERS",
     "GRAPH_VISUALIZER_NAMES",
-    "MPL_LAYOUTS",
     "GraphVisualizer",
 ]

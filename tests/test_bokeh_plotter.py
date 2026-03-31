@@ -205,10 +205,7 @@ def _point_is_inside_rect(
     rect: tuple[float, float, float, float],
 ) -> bool:
     rect_x, rect_y, rect_width, rect_height = rect
-    return (
-        abs(x_coord - rect_x) <= rect_width / 2.0
-        and abs(y_coord - rect_y) <= rect_height / 2.0
-    )
+    return abs(x_coord - rect_x) <= rect_width / 2.0 and abs(y_coord - rect_y) <= rect_height / 2.0
 
 
 def _node_visual_fits_inside_rect(

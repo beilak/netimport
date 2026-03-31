@@ -564,7 +564,7 @@ def _should_use_side_by_side_sections(
         packed_children.width * packed_children.height
         + direct_nodes_layout.width * direct_nodes_layout.height
     )
-    return combined_area >= (layout_tuning.node_block_cell_span ** 2) * 6.0
+    return combined_area >= (layout_tuning.node_block_cell_span**2) * 6.0
 
 
 def _build_folder_container_layout(  # noqa: PLR0913
@@ -602,9 +602,7 @@ def _build_folder_container_layout(  # noqa: PLR0913
     has_child_section = packed_children.height > 0.0
     has_direct_node_section = direct_nodes_layout.height > 0.0
     section_gap = (
-        layout_tuning.folder_section_gap
-        if has_child_section and has_direct_node_section
-        else 0.0
+        layout_tuning.folder_section_gap if has_child_section and has_direct_node_section else 0.0
     )
     if use_side_by_side_sections:
         content_width = max(
@@ -622,13 +620,11 @@ def _build_folder_container_layout(  # noqa: PLR0913
             / 2.0
         )
         child_origin_y = (
-            layout_tuning.folder_padding_y
-            + (content_height - packed_children.height) / 2.0
+            layout_tuning.folder_padding_y + (content_height - packed_children.height) / 2.0
         )
         direct_origin_x = child_origin_x + packed_children.width + section_gap
         direct_origin_y = (
-            layout_tuning.folder_padding_y
-            + (content_height - direct_nodes_layout.height) / 2.0
+            layout_tuning.folder_padding_y + (content_height - direct_nodes_layout.height) / 2.0
         )
     else:
         content_width = max(
@@ -639,19 +635,13 @@ def _build_folder_container_layout(  # noqa: PLR0913
         sections_height = packed_children.height + direct_nodes_layout.height + section_gap
         content_height = max(layout_tuning.min_folder_content_height, sections_height)
         child_origin_x = (
-            layout_tuning.folder_padding_x
-            + (content_width - packed_children.width) / 2.0
+            layout_tuning.folder_padding_x + (content_width - packed_children.width) / 2.0
         )
         child_origin_y = layout_tuning.folder_padding_y
         direct_origin_x = (
-            layout_tuning.folder_padding_x
-            + (content_width - direct_nodes_layout.width) / 2.0
+            layout_tuning.folder_padding_x + (content_width - direct_nodes_layout.width) / 2.0
         )
-        direct_origin_y = (
-            layout_tuning.folder_padding_y
-            + packed_children.height
-            + section_gap
-        )
+        direct_origin_y = layout_tuning.folder_padding_y + packed_children.height + section_gap
     node_positions = {
         node_id: (direct_origin_x + local_x, direct_origin_y + local_y)
         for node_id, (local_x, local_y) in direct_nodes_layout.positions.items()
@@ -664,9 +654,7 @@ def _build_folder_container_layout(  # noqa: PLR0913
     return ContainerLayout(
         width=content_width + 2 * layout_tuning.folder_padding_x,
         height=(
-            content_height
-            + 2 * layout_tuning.folder_padding_y
-            + layout_tuning.folder_label_height
+            content_height + 2 * layout_tuning.folder_padding_y + layout_tuning.folder_label_height
         ),
         node_positions=node_positions,
         child_origins=child_origins,
@@ -706,9 +694,7 @@ def _build_root_container_layout(  # noqa: PLR0913
     has_root_folder_section = packed_root_folders.height > 0.0
     has_root_node_section = root_nodes_layout.height > 0.0
     root_section_gap = (
-        layout_tuning.root_section_gap
-        if has_root_folder_section and has_root_node_section
-        else 0.0
+        layout_tuning.root_section_gap if has_root_folder_section and has_root_node_section else 0.0
     )
     if use_side_by_side_sections:
         total_width = packed_root_folders.width + root_nodes_layout.width + root_section_gap
@@ -882,29 +868,11 @@ def _measure_layout_bounds(
     max_y: float | None = None
 
     for node_id, (x_coord, y_coord) in final_positions.items():
-        node_radius = _node_visual_radius_units(
-            _get_node_visual_size(node_visual_data, node_id)
-        )
-        min_x = (
-            x_coord - node_radius
-            if min_x is None
-            else min(min_x, x_coord - node_radius)
-        )
-        max_x = (
-            x_coord + node_radius
-            if max_x is None
-            else max(max_x, x_coord + node_radius)
-        )
-        min_y = (
-            y_coord - node_radius
-            if min_y is None
-            else min(min_y, y_coord - node_radius)
-        )
-        max_y = (
-            y_coord + node_radius
-            if max_y is None
-            else max(max_y, y_coord + node_radius)
-        )
+        node_radius = _node_visual_radius_units(_get_node_visual_size(node_visual_data, node_id))
+        min_x = x_coord - node_radius if min_x is None else min(min_x, x_coord - node_radius)
+        max_x = x_coord + node_radius if max_x is None else max(max_x, x_coord + node_radius)
+        min_y = y_coord - node_radius if min_y is None else min(min_y, y_coord - node_radius)
+        max_y = y_coord + node_radius if max_y is None else max(max_y, y_coord + node_radius)
 
     for center_x, center_y, width, height in zip(
         folder_rect_data["x"],
@@ -1098,10 +1066,7 @@ def _build_edge_visual_style(graph: nx.DiGraph) -> EdgeVisualStyle:
             arrow_line_width=1.0,
             arrow_head_size=8,
         )
-    if (
-        node_count >= MEDIUM_GRAPH_NODE_COUNT_THRESHOLD
-        or edge_count >= MEDIUM_EDGE_COUNT_THRESHOLD
-    ):
+    if node_count >= MEDIUM_GRAPH_NODE_COUNT_THRESHOLD or edge_count >= MEDIUM_EDGE_COUNT_THRESHOLD:
         return EdgeVisualStyle(
             line_alpha=0.18,
             line_width=1.0,
@@ -1121,16 +1086,12 @@ def _build_edge_visual_style(graph: nx.DiGraph) -> EdgeVisualStyle:
 def _build_render_policy(graph: nx.DiGraph) -> RenderPolicy:
     node_count = graph.number_of_nodes()
     edge_count = graph.number_of_edges()
-    dense_graph = (
-        node_count >= LOD_RENDER_NODE_THRESHOLD
-        or edge_count >= LOD_RENDER_EDGE_THRESHOLD
-    )
+    dense_graph = node_count >= LOD_RENDER_NODE_THRESHOLD or edge_count >= LOD_RENDER_EDGE_THRESHOLD
     return RenderPolicy(
         # Use a single canvas backend so browser rendering stays consistent.
         output_backend="canvas",
         show_arrows=not (
-            node_count >= ARROW_RENDER_NODE_THRESHOLD
-            or edge_count >= ARROW_RENDER_EDGE_THRESHOLD
+            node_count >= ARROW_RENDER_NODE_THRESHOLD or edge_count >= ARROW_RENDER_EDGE_THRESHOLD
         ),
         lod_threshold=1 if dense_graph else None,
         lod_factor=LOD_FACTOR,

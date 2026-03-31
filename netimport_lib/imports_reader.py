@@ -35,6 +35,29 @@ class _ImportVisitor(ast.NodeVisitor):
         self.imports: list[_ImportItem] = []
         self._in_type_checking_block = False
 
+    def visit_Import(self, node: ast.Import) -> None:
+        self._extract_imports(node.names, None, level=0)
+        self.generic_visit(node)
+
+    def visit_ImportFrom(self, node: ast.ImportFrom) -> None:
+        self._extract_imports(node.names, node.module, level=node.level)
+        self.generic_visit(node)
+
+    def visit_If(self, node: ast.If) -> None:
+        is_type_checking_if = _is_type_checking_test(node.test)
+        previous_state = self._in_type_checking_block
+
+        if is_type_checking_if:
+            self._in_type_checking_block = True
+
+        for statement in node.body:
+            self.visit(statement)
+
+        self._in_type_checking_block = previous_state
+
+        for statement in node.orelse:
+            self.visit(statement)
+
     def _extract_imports(
         self,
         node_names: list[ast.alias],
@@ -64,29 +87,6 @@ class _ImportVisitor(ast.NodeVisitor):
                 )
             )
 
-    def visit_Import(self, node: ast.Import) -> None:
-        self._extract_imports(node.names, None, level=0)
-        self.generic_visit(node)
-
-    def visit_ImportFrom(self, node: ast.ImportFrom) -> None:
-        self._extract_imports(node.names, node.module, level=node.level)
-        self.generic_visit(node)
-
-    def visit_If(self, node: ast.If) -> None:
-        is_type_checking_if = _is_type_checking_test(node.test)
-        previous_state = self._in_type_checking_block
-
-        if is_type_checking_if:
-            self._in_type_checking_block = True
-
-        for statement in node.body:
-            self.visit(statement)
-
-        self._in_type_checking_block = previous_state
-
-        for statement in node.orelse:
-            self.visit(statement)
-
 
 def _is_type_checking_test(node: ast.expr) -> bool:
     if isinstance(node, ast.Name):
@@ -94,6 +94,34 @@ def _is_type_checking_test(node: ast.expr) -> bool:
     if isinstance(node, ast.Attribute):
         return node.attr == "TYPE_CHECKING"
     return False
+
+
+def _parse_source_tree(path: Path, file_path: str) -> ast.AST | None:
+    try:
+        source_code = path.read_text(encoding="utf-8")
+    except (OSError, UnicodeDecodeError):
+        return None
+
+    try:
+        return ast.parse(source_code, filename=file_path)
+    except SyntaxError:
+        return None
+
+
+def _collect_imported_names(
+    visitor: _ImportVisitor,
+    include_type_checking_imports: bool,
+) -> list[str]:
+    imported_module_names: list[str] = []
+
+    for import_item in visitor.imports:
+        if not include_type_checking_imports and import_item.is_type_checking:
+            continue
+
+        imported_name = import_item.full_imported_name
+        if imported_name:
+            imported_module_names.append(imported_name)
+    return imported_module_names
 
 
 def get_imported_modules_as_strings(
@@ -105,20 +133,10 @@ def get_imported_modules_as_strings(
     if not path.exists() or not path.is_file():
         return []
 
-    try:
-        source_code = path.read_text(encoding="utf-8")
-        tree = ast.parse(source_code, filename=file_path)
-    except (OSError, SyntaxError, UnicodeDecodeError):
+    tree = _parse_source_tree(path, file_path)
+    if tree is None:
         return []
 
     visitor = _ImportVisitor()
     visitor.visit(tree)
-
-    imported_module_names = [
-        import_item.full_imported_name
-        for import_item in visitor.imports
-        if include_type_checking_imports or not import_item.is_type_checking
-        if import_item.full_imported_name
-    ]
-
-    return sorted(imported_module_names)
+    return sorted(_collect_imported_names(visitor, include_type_checking_imports))

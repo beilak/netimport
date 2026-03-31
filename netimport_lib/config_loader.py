@@ -2,7 +2,7 @@
 
 from collections.abc import Mapping
 from pathlib import Path
-from typing import Final, TypedDict
+from typing import Final, Literal, TypedDict
 
 import toml
 
@@ -36,15 +36,37 @@ PYPROJECT_TOML_FILE: Final[str] = "pyproject.toml"
 TOOL_SECTION_NAME: Final[str] = "tool"
 APP_CONFIG_SECTION_NAME: Final[str] = "netimport"
 
-IGNORED_NODES_KEY: Final[str] = "ignored_nodes"
-IGNORED_DIRS_KEY: Final[str] = "ignored_dirs"
-IGNORED_FILES_KEY: Final[str] = "ignored_files"
-IGNORE_STDLIB_KEY: Final[str] = "ignore_stdlib"
-IGNORE_EXTERNAL_LIB_KEY: Final[str] = "ignore_external_lib"
-FAIL_ON_UNRESOLVED_IMPORTS_KEY: Final[str] = "fail_on_unresolved_imports"
-FORBIDDEN_EXTERNAL_LIBS_KEY: Final[str] = "forbidden_external_libs"
+StringSetConfigKey = Literal[
+    "ignored_nodes",
+    "ignored_dirs",
+    "ignored_files",
+    "forbidden_external_libs",
+]
+BoolConfigKey = Literal[
+    "ignore_stdlib",
+    "ignore_external_lib",
+    "fail_on_unresolved_imports",
+]
+IGNORED_NODES_KEY: Final[StringSetConfigKey] = "ignored_nodes"
+IGNORED_DIRS_KEY: Final[StringSetConfigKey] = "ignored_dirs"
+IGNORED_FILES_KEY: Final[StringSetConfigKey] = "ignored_files"
+IGNORE_STDLIB_KEY: Final[BoolConfigKey] = "ignore_stdlib"
+IGNORE_EXTERNAL_LIB_KEY: Final[BoolConfigKey] = "ignore_external_lib"
+FAIL_ON_UNRESOLVED_IMPORTS_KEY: Final[BoolConfigKey] = "fail_on_unresolved_imports"
+FORBIDDEN_EXTERNAL_LIBS_KEY: Final[StringSetConfigKey] = "forbidden_external_libs"
+STRING_SET_CONFIG_KEYS: Final[tuple[StringSetConfigKey, ...]] = (
+    IGNORED_NODES_KEY,
+    IGNORED_DIRS_KEY,
+    IGNORED_FILES_KEY,
+    FORBIDDEN_EXTERNAL_LIBS_KEY,
+)
+BOOL_CONFIG_KEYS: Final[tuple[BoolConfigKey, ...]] = (
+    IGNORE_STDLIB_KEY,
+    IGNORE_EXTERNAL_LIB_KEY,
+    FAIL_ON_UNRESOLVED_IMPORTS_KEY,
+)
 KNOWN_CONFIG_KEYS: Final[frozenset[str]] = frozenset(
-    {
+    (
         IGNORED_NODES_KEY,
         IGNORED_DIRS_KEY,
         IGNORED_FILES_KEY,
@@ -52,8 +74,85 @@ KNOWN_CONFIG_KEYS: Final[frozenset[str]] = frozenset(
         IGNORE_EXTERNAL_LIB_KEY,
         FAIL_ON_UNRESOLVED_IMPORTS_KEY,
         FORBIDDEN_EXTERNAL_LIBS_KEY,
-    }
+    )
 )
+
+
+class _ConfigTools:
+    """Private namespace for config parsing helpers."""
+
+    @classmethod
+    def parse_string_set(
+        cls,
+        app_config: Mapping[str, object],
+        key: StringSetConfigKey,
+    ) -> set[str]:
+        raw_value = app_config[key]
+        if not isinstance(raw_value, list):
+            raise TypeError(f"Config key '{key}' must be a list of strings.")
+        if not all(isinstance(string_value, str) for string_value in raw_value):
+            raise TypeError(f"Config key '{key}' must be a list of strings.")
+        return set(raw_value)
+
+    @classmethod
+    def parse_bool(
+        cls,
+        app_config: Mapping[str, object],
+        key: BoolConfigKey,
+    ) -> bool:
+        raw_value = app_config[key]
+        if not isinstance(raw_value, bool):
+            raise TypeError(f"Config key '{key}' must be a boolean.")
+        return raw_value
+
+    @classmethod
+    def validate_config_keys(cls, app_config: Mapping[str, object]) -> None:
+        unexpected_keys = sorted(set(app_config) - KNOWN_CONFIG_KEYS)
+        if unexpected_keys:
+            joined_keys = ", ".join(unexpected_keys)
+            raise ValueError(f"Unknown NetImport config keys: {joined_keys}.")
+
+    @classmethod
+    def parse_config_object(
+        cls,
+        app_config: Mapping[str, object],
+    ) -> PartialNetImportConfigMap:
+        cls.validate_config_keys(app_config)
+        parsed_config: PartialNetImportConfigMap = {}
+
+        for string_key in STRING_SET_CONFIG_KEYS:
+            if string_key in app_config:
+                parsed_config[string_key] = cls.parse_string_set(app_config, string_key)
+        for bool_key in BOOL_CONFIG_KEYS:
+            if bool_key in app_config:
+                parsed_config[bool_key] = cls.parse_bool(app_config, bool_key)
+        return parsed_config
+
+    @classmethod
+    def load_toml_table(cls, config_path: Path) -> Mapping[str, object]:
+        with config_path.open(encoding="utf-8") as file_handle:
+            toml_data = toml.load(file_handle)
+        if not isinstance(toml_data, Mapping):
+            raise TypeError(f"Config file '{config_path}' must contain a TOML table.")
+        return toml_data
+
+    @classmethod
+    def get_pyproject_app_config(
+        cls,
+        config_data: Mapping[str, object],
+    ) -> Mapping[str, object] | None:
+        tool_section = config_data.get(TOOL_SECTION_NAME)
+        if not isinstance(tool_section, Mapping):
+            return None
+
+        app_config = tool_section.get(APP_CONFIG_SECTION_NAME)
+        if not isinstance(app_config, Mapping):
+            return None
+        return app_config
+
+    @classmethod
+    def contains_known_config_keys(cls, config_data: Mapping[str, object]) -> bool:
+        return any(key in config_data for key in KNOWN_CONFIG_KEYS)
 
 
 def default_config() -> NetImportConfigMap:
@@ -69,156 +168,53 @@ def default_config() -> NetImportConfigMap:
     )
 
 
-def _parse_string_set(app_config: Mapping[str, object], key: str) -> set[str]:
-    value = app_config[key]
-    if not isinstance(value, list) or not all(isinstance(item, str) for item in value):
-        raise TypeError(f"Config key '{key}' must be a list of strings.")
-
-    return set(value)
-
-
-def _parse_bool(app_config: Mapping[str, object], key: str) -> bool:
-    value = app_config[key]
-    if not isinstance(value, bool):
-        raise TypeError(f"Config key '{key}' must be a boolean.")
-
-    return value
-
-
-def _validate_config_keys(app_config: Mapping[str, object]) -> None:
-    unexpected_keys = sorted(set(app_config) - KNOWN_CONFIG_KEYS)
-    if unexpected_keys:
-        joined_keys = ", ".join(unexpected_keys)
-        raise ValueError(f"Unknown NetImport config keys: {joined_keys}.")
-
-
-def _parse_config_object(app_config: Mapping[str, object]) -> PartialNetImportConfigMap:
-    _validate_config_keys(app_config)
-
-    parsed_config: PartialNetImportConfigMap = {}
-
-    if "ignored_nodes" in app_config:
-        parsed_config["ignored_nodes"] = _parse_string_set(app_config, IGNORED_NODES_KEY)
-    if "ignored_dirs" in app_config:
-        parsed_config["ignored_dirs"] = _parse_string_set(app_config, IGNORED_DIRS_KEY)
-    if "ignored_files" in app_config:
-        parsed_config["ignored_files"] = _parse_string_set(app_config, IGNORED_FILES_KEY)
-    if "ignore_stdlib" in app_config:
-        parsed_config["ignore_stdlib"] = _parse_bool(app_config, IGNORE_STDLIB_KEY)
-    if "ignore_external_lib" in app_config:
-        parsed_config["ignore_external_lib"] = _parse_bool(app_config, IGNORE_EXTERNAL_LIB_KEY)
-    if "fail_on_unresolved_imports" in app_config:
-        parsed_config["fail_on_unresolved_imports"] = _parse_bool(
-            app_config,
-            FAIL_ON_UNRESOLVED_IMPORTS_KEY,
-        )
-    if "forbidden_external_libs" in app_config:
-        parsed_config["forbidden_external_libs"] = _parse_string_set(
-            app_config,
-            FORBIDDEN_EXTERNAL_LIBS_KEY,
-        )
-
-    return parsed_config
-
-
 def merge_config(
     base_config: NetImportConfigMap,
     override_config: PartialNetImportConfigMap,
 ) -> NetImportConfigMap:
     """Return a full config with a partial override applied on top."""
-    ignored_nodes = set(base_config["ignored_nodes"])
-    ignored_dirs = set(base_config["ignored_dirs"])
-    ignored_files = set(base_config["ignored_files"])
-    ignore_stdlib = base_config["ignore_stdlib"]
-    ignore_external_lib = base_config["ignore_external_lib"]
-    fail_on_unresolved_imports = base_config["fail_on_unresolved_imports"]
-    forbidden_external_libs = set(base_config["forbidden_external_libs"])
-
-    if "ignored_nodes" in override_config:
-        ignored_nodes = set(override_config["ignored_nodes"])
-    if "ignored_dirs" in override_config:
-        ignored_dirs = set(override_config["ignored_dirs"])
-    if "ignored_files" in override_config:
-        ignored_files = set(override_config["ignored_files"])
-    if "ignore_stdlib" in override_config:
-        ignore_stdlib = override_config["ignore_stdlib"]
-    if "ignore_external_lib" in override_config:
-        ignore_external_lib = override_config["ignore_external_lib"]
-    if "fail_on_unresolved_imports" in override_config:
-        fail_on_unresolved_imports = override_config["fail_on_unresolved_imports"]
-    if "forbidden_external_libs" in override_config:
-        forbidden_external_libs = set(override_config["forbidden_external_libs"])
+    override_ignore_stdlib = override_config.get(IGNORE_STDLIB_KEY)
+    override_ignore_external_lib = override_config.get(IGNORE_EXTERNAL_LIB_KEY)
+    override_fail_on_unresolved_imports = override_config.get(FAIL_ON_UNRESOLVED_IMPORTS_KEY)
 
     return NetImportConfigMap(
-        ignored_nodes=ignored_nodes,
-        ignored_dirs=ignored_dirs,
-        ignored_files=ignored_files,
-        ignore_stdlib=ignore_stdlib,
-        ignore_external_lib=ignore_external_lib,
-        fail_on_unresolved_imports=fail_on_unresolved_imports,
-        forbidden_external_libs=forbidden_external_libs,
+        ignored_nodes=set(override_config.get(IGNORED_NODES_KEY, base_config[IGNORED_NODES_KEY])),
+        ignored_dirs=set(override_config.get(IGNORED_DIRS_KEY, base_config[IGNORED_DIRS_KEY])),
+        ignored_files=set(override_config.get(IGNORED_FILES_KEY, base_config[IGNORED_FILES_KEY])),
+        ignore_stdlib=(
+            base_config[IGNORE_STDLIB_KEY]
+            if override_ignore_stdlib is None
+            else override_ignore_stdlib
+        ),
+        ignore_external_lib=(
+            base_config[IGNORE_EXTERNAL_LIB_KEY]
+            if override_ignore_external_lib is None
+            else override_ignore_external_lib
+        ),
+        fail_on_unresolved_imports=(
+            base_config[FAIL_ON_UNRESOLVED_IMPORTS_KEY]
+            if override_fail_on_unresolved_imports is None
+            else override_fail_on_unresolved_imports
+        ),
+        forbidden_external_libs=set(
+            override_config.get(
+                FORBIDDEN_EXTERNAL_LIBS_KEY,
+                base_config[FORBIDDEN_EXTERNAL_LIBS_KEY],
+            )
+        ),
     )
-
-
-def _load_toml_table(config_path: Path) -> Mapping[str, object]:
-    with config_path.open(encoding="utf-8") as file_handle:
-        data = toml.load(file_handle)
-
-    if not isinstance(data, Mapping):
-        raise TypeError(f"Config file '{config_path}' must contain a TOML table.")
-
-    return data
-
-
-def _get_pyproject_app_config(data: Mapping[str, object]) -> Mapping[str, object] | None:
-    tool_section = data.get(TOOL_SECTION_NAME)
-    if not isinstance(tool_section, Mapping):
-        return None
-
-    app_config = tool_section.get(APP_CONFIG_SECTION_NAME)
-    if not isinstance(app_config, Mapping):
-        return None
-
-    return app_config
-
-
-def _contains_known_config_keys(data: Mapping[str, object]) -> bool:
-    return any(key in data for key in KNOWN_CONFIG_KEYS)
-
-
-def _load_pyproject_config(project_root: Path) -> PartialNetImportConfigMap:
-    pyproject_path = project_root / PYPROJECT_TOML_FILE
-    if not pyproject_path.exists():
-        return {}
-
-    data = _load_toml_table(pyproject_path)
-    app_config = _get_pyproject_app_config(data)
-    if app_config is None:
-        return {}
-
-    return _parse_config_object(app_config)
-
-
-def _load_netimport_config(project_root: Path) -> PartialNetImportConfigMap:
-    config_path = project_root / CONFIG_FILE_NAME
-    if not config_path.exists():
-        return {}
-
-    data = _load_toml_table(config_path)
-    return _parse_config_object(data)
 
 
 def load_explicit_config(config_path: str | Path) -> PartialNetImportConfigMap:
     """Load a NetImport override config from an explicit TOML file path."""
     resolved_config_path: Final[Path] = Path(config_path).resolve()
-    data = _load_toml_table(resolved_config_path)
+    config_data = _ConfigTools.load_toml_table(resolved_config_path)
 
-    app_config = _get_pyproject_app_config(data)
+    app_config = _ConfigTools.get_pyproject_app_config(config_data)
     if app_config is not None:
-        return _parse_config_object(app_config)
-
-    if _contains_known_config_keys(data):
-        return _parse_config_object(data)
+        return _ConfigTools.parse_config_object(app_config)
+    if _ConfigTools.contains_known_config_keys(config_data):
+        return _ConfigTools.parse_config_object(config_data)
 
     raise ValueError(
         f"Config file '{resolved_config_path}' does not contain NetImport config. "
@@ -229,10 +225,23 @@ def load_explicit_config(config_path: str | Path) -> PartialNetImportConfigMap:
 def load_config(project_root: str) -> NetImportConfigMap:
     """Load the merged NetImport configuration for a project root."""
     project_root_path: Final[Path] = Path(project_root).resolve()
-    pyproject_config = _load_pyproject_config(project_root_path)
-    dot_netimport_config = _load_netimport_config(project_root_path)
-
-    return merge_config(
-        merge_config(default_config(), pyproject_config),
-        dot_netimport_config,
+    pyproject_path = project_root_path / PYPROJECT_TOML_FILE
+    merged_config = default_config()
+    pyproject_app_config = (
+        _ConfigTools.get_pyproject_app_config(_ConfigTools.load_toml_table(pyproject_path))
+        if pyproject_path.exists()
+        else None
     )
+    if pyproject_app_config is not None:
+        merged_config = merge_config(
+            merged_config,
+            _ConfigTools.parse_config_object(pyproject_app_config),
+        )
+
+    dot_netimport_path = project_root_path / CONFIG_FILE_NAME
+    if dot_netimport_path.exists():
+        merged_config = merge_config(
+            merged_config,
+            _ConfigTools.parse_config_object(_ConfigTools.load_toml_table(dot_netimport_path)),
+        )
+    return merged_config

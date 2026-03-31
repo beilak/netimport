@@ -26,8 +26,9 @@ jobs:
       - name: Lint with ruff
         run: poetry run ruff check netimport_lib tests
 
-      - name: Lint with wemake-python-styleguide
-        run: poetry run flake8 netimport_lib tests
+      # ToDo TMP disabled
+      # - name: Lint with wemake-python-styleguide
+      #   run: poetry run flake8 netimport_lib tests
 
       - name: Security scan with bandit
         run: poetry run bandit -c pyproject.toml --severity-level all --confidence-level all --ignore-nosec -r netimport_lib

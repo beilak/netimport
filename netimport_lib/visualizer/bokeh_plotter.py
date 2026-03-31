@@ -28,7 +28,6 @@ from bokeh.models.tools import (
     BoxZoomTool,
     HoverTool,
     PanTool,
-    PointDrawTool,
     ResetTool,
     SaveTool,
     TapTool,
@@ -178,7 +177,6 @@ class RenderPolicy:
 
     output_backend: Literal["canvas", "svg", "webgl"]
     show_arrows: bool
-    enable_node_dragging: bool
     lod_threshold: int | None
     lod_factor: int
     lod_interval: int
@@ -202,8 +200,6 @@ MEDIUM_EDGE_COUNT_THRESHOLD: Final[int] = 140
 COMPACT_EDGE_COUNT_THRESHOLD: Final[int] = 320
 ARROW_RENDER_NODE_THRESHOLD: Final[int] = 90
 ARROW_RENDER_EDGE_THRESHOLD: Final[int] = 140
-NODE_DRAGGING_NODE_THRESHOLD: Final[int] = 70
-NODE_DRAGGING_EDGE_THRESHOLD: Final[int] = 110
 LOD_RENDER_NODE_THRESHOLD: Final[int] = 120
 LOD_RENDER_EDGE_THRESHOLD: Final[int] = 180
 LOD_FACTOR: Final[int] = 6
@@ -1140,10 +1136,6 @@ def _build_render_policy(graph: nx.DiGraph) -> RenderPolicy:
             node_count >= ARROW_RENDER_NODE_THRESHOLD
             or edge_count >= ARROW_RENDER_EDGE_THRESHOLD
         ),
-        enable_node_dragging=not (
-            node_count >= NODE_DRAGGING_NODE_THRESHOLD
-            or edge_count >= NODE_DRAGGING_EDGE_THRESHOLD
-        ),
         lod_threshold=1 if dense_graph else None,
         lod_factor=LOD_FACTOR,
         lod_interval=LOD_INTERVAL_MS,
@@ -1205,8 +1197,8 @@ def _create_bokeh_plot(
     plot.lod_timeout = render_policy.lod_timeout
 
     pan_tool = PanTool()
-    zoom_tool = WheelZoomTool(maintain_focus=False, speed=1.1)
-    hover_tool = HoverTool()
+    zoom_tool = WheelZoomTool(maintain_focus=False, visible=False)
+    hover_tool = HoverTool(visible=False)
     plot.add_tools(
         pan_tool,
         zoom_tool,
@@ -1215,7 +1207,7 @@ def _create_bokeh_plot(
         BoxZoomTool(),
         ResetTool(),
         SaveTool(),
-        TapTool(),
+        TapTool(visible=False),
         hover_tool,
     )
     plot.toolbar.active_drag = pan_tool
@@ -1389,12 +1381,6 @@ def _configure_hover(plot: figure_model, graph_renderer: GraphRenderer) -> None:
     ]
 
 
-def _enable_node_dragging(plot: figure_model, graph_renderer: GraphRenderer) -> None:
-    point_draw_tool = PointDrawTool(renderers=[graph_renderer.node_renderer])
-    plot.add_tools(point_draw_tool)
-    plot.toolbar.active_drag = point_draw_tool
-
-
 def _build_bokeh_output_path() -> Path:
     with tempfile.NamedTemporaryFile(
         prefix=BOKEH_OUTPUT_PREFIX,
@@ -1516,8 +1502,6 @@ def draw_bokeh_graph(graph: nx.DiGraph, layout: str) -> str | None:
     graph_renderer.selection_policy = NodesAndLinkedEdges()
     graph_renderer.inspection_policy = NodesAndLinkedEdges()
     _configure_hover(plot, graph_renderer)
-    if render_policy.enable_node_dragging:
-        _enable_node_dragging(plot, graph_renderer)
     plot.renderers.append(graph_renderer)
 
     return _present_plot(plot)

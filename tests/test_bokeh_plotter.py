@@ -5,7 +5,7 @@ from typing import TYPE_CHECKING, cast
 import networkx as nx
 import pytest
 from _pytest.monkeypatch import MonkeyPatch
-from bokeh.models import HoverTool, PointDrawTool, Range1d
+from bokeh.models import HoverTool, PanTool, Range1d, TapTool, WheelZoomTool
 from bokeh.models.annotations import Arrow
 from bokeh.models.renderers import GraphRenderer
 
@@ -365,7 +365,6 @@ def test_draw_bokeh_graph_configures_headless_plot_contract(
 
     shown_plot = cast("figure_model", shown_plots[0])
     hover_tool = cast("HoverTool", shown_plot.select_one({"type": HoverTool}))
-    drag_tool = cast("PointDrawTool", shown_plot.select_one({"type": PointDrawTool}))
 
     assert hover_tool.tooltips == [
         ("Name", "@viz_label"),
@@ -378,8 +377,7 @@ def test_draw_bokeh_graph_configures_headless_plot_contract(
     ]
     assert hover_tool.renderers is not None
     assert len(hover_tool.renderers) == 1
-    assert drag_tool.renderers is not None
-    assert len(drag_tool.renderers) == 1
+    assert shown_plot.select_one({"type": PanTool}) is not None
     assert len(shown_plot.select({"type": Arrow})) == 1
 
 
@@ -395,6 +393,8 @@ def test_draw_bokeh_graph_uses_single_non_duplicated_toolbar_configuration(
 
     shown_plot = cast("figure_model", shown_plots[0])
     tool_type_names = [type(tool).__name__ for tool in shown_plot.tools]
+    tap_tool = cast("TapTool", shown_plot.select_one({"type": TapTool}))
+    wheel_zoom_tool = cast("WheelZoomTool", shown_plot.select_one({"type": WheelZoomTool}))
 
     assert tool_type_names.count("PanTool") == 1
     assert tool_type_names.count("WheelZoomTool") == 1
@@ -405,7 +405,12 @@ def test_draw_bokeh_graph_uses_single_non_duplicated_toolbar_configuration(
     assert tool_type_names.count("SaveTool") == 1
     assert tool_type_names.count("TapTool") == 1
     assert tool_type_names.count("HoverTool") == 1
-    assert tool_type_names.count("PointDrawTool") == 1
+    assert tap_tool.visible is False
+    assert cast("HoverTool", shown_plot.select_one({"type": HoverTool})).visible is False
+    assert wheel_zoom_tool.visible is False
+    assert wheel_zoom_tool.speed == pytest.approx(1 / 600)
+    assert shown_plot.toolbar.active_scroll == "auto"
+    assert type(shown_plot.toolbar.active_drag).__name__ == "PanTool"
 
 
 def test_draw_bokeh_graph_places_persistent_toolbar_on_the_left(
@@ -626,7 +631,8 @@ def test_draw_bokeh_graph_uses_lighter_edge_style_for_large_graphs(
     assert graph_renderer.edge_renderer.glyph.line_alpha == pytest.approx(0.18)
     assert graph_renderer.edge_renderer.glyph.line_width == pytest.approx(1.0)
     assert shown_plot.select_one({"type": Arrow}) is None
-    assert shown_plot.select_one({"type": PointDrawTool}) is None
+    assert shown_plot.select_one({"type": PanTool}) is not None
+    assert type(shown_plot.toolbar.active_drag).__name__ == "PanTool"
 
 
 def test_draw_bokeh_graph_uses_larger_canvas_for_large_graphs(

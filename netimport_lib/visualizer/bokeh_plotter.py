@@ -12,10 +12,11 @@ from collections.abc import Mapping, Sequence
 from dataclasses import dataclass
 from pathlib import Path
 from types import MappingProxyType
-from typing import Final, TypedDict, cast
+from typing import Any, Final, Literal, TypedDict, cast
 
 import networkx as nx
 from bokeh.io import save
+from bokeh.models import Range1d
 from bokeh.models.annotations.arrows import Arrow, OpenHead
 from bokeh.models.annotations.labels import LabelSet
 from bokeh.models.css import InlineStyleSheet
@@ -32,6 +33,8 @@ from bokeh.models.tools import (
     SaveTool,
     TapTool,
     WheelZoomTool,
+    ZoomInTool,
+    ZoomOutTool,
 )
 from bokeh.plotting import from_networkx
 from bokeh.plotting._figure import figure as figure_model
@@ -138,12 +141,83 @@ class PlotDimensions:
     height: int
 
 
+@dataclass(frozen=True, slots=True)
+class LayoutBounds:
+    """Measured layout extents in data coordinates."""
+
+    min_x: float
+    max_x: float
+    min_y: float
+    max_y: float
+
+    @property
+    def width(self) -> float:
+        """Return the horizontal span of the measured bounds."""
+        return self.max_x - self.min_x
+
+    @property
+    def height(self) -> float:
+        """Return the vertical span of the measured bounds."""
+        return self.max_y - self.min_y
+
+
+@dataclass(frozen=True, slots=True)
+class EdgeVisualStyle:
+    """Adaptive styling for edge and arrow rendering."""
+
+    line_alpha: float
+    line_width: float
+    arrow_alpha: float
+    arrow_line_width: float
+    arrow_head_size: int
+
+
+@dataclass(frozen=True, slots=True)
+class RenderPolicy:
+    """Adaptive renderer behavior for correctness and interactivity."""
+
+    output_backend: Literal["canvas", "svg", "webgl"]
+    show_arrows: bool
+    enable_node_dragging: bool
+    lod_threshold: int | None
+    lod_factor: int
+    lod_interval: int
+    lod_timeout: int
+
+
 FREEZE_RANDOM_SEED: Final[int] = 42
 LABEL_PADDING: Final[float] = 20.0
 MIN_NODE_SIZE: Final[int] = 20
+MEDIUM_GRAPH_MIN_NODE_SIZE: Final[int] = 18
+COMPACT_GRAPH_MIN_NODE_SIZE: Final[int] = 16
+MAX_NODE_SIZE: Final[int] = 60
+MEDIUM_GRAPH_MAX_NODE_SIZE: Final[int] = 50
+COMPACT_GRAPH_MAX_NODE_SIZE: Final[int] = 42
+NODE_SIZE_SQRT_SCALE: Final[float] = 6.0
+MEDIUM_GRAPH_NODE_SIZE_SQRT_SCALE: Final[float] = 5.0
+COMPACT_GRAPH_NODE_SIZE_SQRT_SCALE: Final[float] = 4.0
+MEDIUM_GRAPH_NODE_COUNT_THRESHOLD: Final[int] = 80
+COMPACT_GRAPH_NODE_COUNT_THRESHOLD: Final[int] = 180
+MEDIUM_EDGE_COUNT_THRESHOLD: Final[int] = 140
+COMPACT_EDGE_COUNT_THRESHOLD: Final[int] = 320
+ARROW_RENDER_NODE_THRESHOLD: Final[int] = 90
+ARROW_RENDER_EDGE_THRESHOLD: Final[int] = 140
+NODE_DRAGGING_NODE_THRESHOLD: Final[int] = 70
+NODE_DRAGGING_EDGE_THRESHOLD: Final[int] = 110
+LOD_RENDER_NODE_THRESHOLD: Final[int] = 120
+LOD_RENDER_EDGE_THRESHOLD: Final[int] = 180
+LOD_FACTOR: Final[int] = 6
+LOD_INTERVAL_MS: Final[int] = 120
+LOD_TIMEOUT_MS: Final[int] = 80
+INITIAL_VIEW_PADDING_FRACTION: Final[float] = 0.14
+INITIAL_VIEW_MIN_PADDING_UNITS: Final[float] = 4.0
+INITIAL_VIEW_SAFETY_SCALE: Final[float] = 1.06
 MIN_NODE_BLOCK_SPAN: Final[float] = 4.0
 NODE_BLOCK_CELL_SPAN: Final[float] = 4.0
 NODE_LAYOUT_INSET: Final[float] = 0.75
+NODE_LAYOUT_CLEARANCE_UNITS: Final[float] = 1.4
+NODE_LAYOUT_OUTER_PADDING_UNITS: Final[float] = 0.8
+LAYOUT_VIEWPORT_PADDING_UNITS: Final[float] = 2.5
 FOLDER_PADDING_X: Final[float] = 1.5
 FOLDER_PADDING_Y: Final[float] = 1.5
 FOLDER_LABEL_HEIGHT: Final[float] = 1.75
@@ -153,11 +227,11 @@ FOLDER_GRID_GAP_Y: Final[float] = 2.0
 ROOT_SECTION_GAP: Final[float] = 3.0
 MIN_FOLDER_CONTENT_WIDTH: Final[float] = 4.0
 MIN_FOLDER_CONTENT_HEIGHT: Final[float] = 3.0
-BASE_PLOT_WIDTH: Final[int] = 900
-BASE_PLOT_HEIGHT: Final[int] = 720
-MAX_PLOT_WIDTH: Final[int] = 2400
-MAX_PLOT_HEIGHT: Final[int] = 1800
-PLOT_PIXELS_PER_LAYOUT_UNIT: Final[float] = 24.0
+BASE_PLOT_WIDTH: Final[int] = 1040
+BASE_PLOT_HEIGHT: Final[int] = 780
+MAX_PLOT_WIDTH: Final[int] = 1800
+MAX_PLOT_HEIGHT: Final[int] = 1320
+PLOT_PIXELS_PER_LAYOUT_UNIT: Final[float] = 30.0
 TOOLBAR_BUTTON_WIDTH_PX: Final[int] = 38
 TOOLBAR_BUTTON_HEIGHT_PX: Final[int] = 38
 TOOLBAR_ICON_SCALE_PERCENT: Final[int] = 72
@@ -250,6 +324,46 @@ def _clamp_float(value: float, minimum: float, maximum: float) -> float:
     return max(minimum, min(value, maximum))
 
 
+def _resolve_node_size_budget(node_count: int) -> tuple[int, int, float]:
+    if node_count >= COMPACT_GRAPH_NODE_COUNT_THRESHOLD:
+        return (
+            COMPACT_GRAPH_MIN_NODE_SIZE,
+            COMPACT_GRAPH_MAX_NODE_SIZE,
+            COMPACT_GRAPH_NODE_SIZE_SQRT_SCALE,
+        )
+    if node_count >= MEDIUM_GRAPH_NODE_COUNT_THRESHOLD:
+        return (
+            MEDIUM_GRAPH_MIN_NODE_SIZE,
+            MEDIUM_GRAPH_MAX_NODE_SIZE,
+            MEDIUM_GRAPH_NODE_SIZE_SQRT_SCALE,
+        )
+    return (MIN_NODE_SIZE, MAX_NODE_SIZE, NODE_SIZE_SQRT_SCALE)
+
+
+def _calculate_node_visual_size(degree: int, node_count: int) -> int:
+    minimum_size, maximum_size, sqrt_scale = _resolve_node_size_budget(node_count)
+    calculated_size = minimum_size + math.sqrt(max(degree, 0)) * sqrt_scale
+    return round(_clamp_float(calculated_size, float(minimum_size), float(maximum_size)))
+
+
+def _get_node_visual_size(
+    node_visual_data: Mapping[object, NodeVisualData],
+    node_id: str,
+) -> int:
+    visual_data = node_visual_data.get(node_id)
+    if visual_data is None:
+        return MIN_NODE_SIZE
+    return max(_to_int(visual_data.get("viz_size", MIN_NODE_SIZE)), 1)
+
+
+def _node_visual_diameter_units(node_visual_size: int) -> float:
+    return float(node_visual_size) / PLOT_PIXELS_PER_LAYOUT_UNIT
+
+
+def _node_visual_radius_units(node_visual_size: int) -> float:
+    return _node_visual_diameter_units(node_visual_size) / 2.0
+
+
 def _build_layout_tuning(
     graph: nx.DiGraph,
     folder_to_nodes: Mapping[str, Sequence[str]],
@@ -321,14 +435,35 @@ def _build_local_node_layout(
     node_ids: Sequence[str],
     node_layout_k: float,
     layout_tuning: LayoutTuning,
+    node_visual_data: Mapping[object, NodeVisualData],
 ) -> LocalNodeLayout:
     ordered_nodes = tuple(sorted(node_ids))
     if not ordered_nodes:
         return LocalNodeLayout(width=0.0, height=0.0, positions={})
 
+    node_visual_sizes = [
+        _get_node_visual_size(node_visual_data, node_id) for node_id in ordered_nodes
+    ]
+    max_node_diameter_units = max(
+        (_node_visual_diameter_units(node_size) for node_size in node_visual_sizes),
+        default=0.0,
+    )
+    cell_span = max(
+        layout_tuning.node_block_cell_span,
+        max_node_diameter_units * 2.0 + NODE_LAYOUT_CLEARANCE_UNITS,
+    )
+    inset = max(
+        layout_tuning.node_layout_inset,
+        max_node_diameter_units / 2.0 + NODE_LAYOUT_OUTER_PADDING_UNITS,
+    )
+    layout_k_multiplier = max(
+        1.0,
+        cell_span / max(layout_tuning.node_block_cell_span, 1.0),
+    )
+
     if len(ordered_nodes) == 1:
-        width = layout_tuning.min_node_block_span
-        height = layout_tuning.min_node_block_span
+        width = max(layout_tuning.min_node_block_span, cell_span)
+        height = max(layout_tuning.min_node_block_span, cell_span)
         return LocalNodeLayout(
             width=width,
             height=height,
@@ -339,11 +474,11 @@ def _build_local_node_layout(
     row_count = math.ceil(len(ordered_nodes) / column_count)
     width = max(
         layout_tuning.min_node_block_span,
-        float(column_count) * layout_tuning.node_block_cell_span,
+        float(column_count) * cell_span,
     )
     height = max(
         layout_tuning.min_node_block_span,
-        float(row_count) * layout_tuning.node_block_cell_span,
+        float(row_count) * cell_span,
     )
     subgraph = _build_sorted_layout_subgraph(graph, ordered_nodes)
     raw_positions = _normalize_layout_positions(
@@ -351,7 +486,7 @@ def _build_local_node_layout(
             "Mapping[str, Sequence[float]]",
             nx.spring_layout(
                 subgraph,
-                k=node_layout_k,
+                k=node_layout_k * layout_k_multiplier,
                 iterations=50,
                 seed=FREEZE_RANDOM_SEED,
                 scale=1,
@@ -365,7 +500,7 @@ def _build_local_node_layout(
             raw_positions,
             width=width,
             height=height,
-            inset=layout_tuning.node_layout_inset,
+            inset=inset,
         ),
     )
 
@@ -448,12 +583,14 @@ def _build_folder_container_layout(  # noqa: PLR0913
     node_layout_k: float,
     folder_layouts: dict[str, ContainerLayout],
     layout_tuning: LayoutTuning,
+    node_visual_data: Mapping[object, NodeVisualData],
 ) -> ContainerLayout:
     direct_nodes_layout = _build_local_node_layout(
         graph,
         folder_to_nodes.get(folder_name, ()),
         node_layout_k,
         layout_tuning,
+        node_visual_data,
     )
     child_names = tuple(sorted(child_folders.get(folder_name, ())))
     child_box_sizes = [
@@ -551,12 +688,14 @@ def _build_root_container_layout(  # noqa: PLR0913
     folder_layouts: Mapping[str, ContainerLayout],
     node_layout_k: float,
     layout_tuning: LayoutTuning,
+    node_visual_data: Mapping[object, NodeVisualData],
 ) -> ContainerLayout:
     root_nodes_layout = _build_local_node_layout(
         graph,
         root_folder_nodes,
         node_layout_k,
         layout_tuning,
+        node_visual_data,
     )
     root_child_sizes = [
         (folder_name, folder_layouts[folder_name].width, folder_layouts[folder_name].height)
@@ -682,6 +821,7 @@ def _assign_folder_positions(  # noqa: PLR0913
 
 def _create_constrained_layout(
     graph: nx.DiGraph,
+    node_visual_data: Mapping[object, NodeVisualData],
     *,
     node_layout_k: float = 0.5,
 ) -> tuple[dict[str, tuple[float, float]], FolderRectData]:
@@ -703,6 +843,7 @@ def _create_constrained_layout(
             node_layout_k,
             folder_layouts,
             layout_tuning,
+            node_visual_data,
         )
 
     root_layout = _build_root_container_layout(
@@ -712,6 +853,7 @@ def _create_constrained_layout(
         folder_layouts,
         node_layout_k,
         layout_tuning,
+        node_visual_data,
     )
     final_positions = {
         node_id: (
@@ -740,17 +882,37 @@ def _create_constrained_layout(
 def _measure_layout_bounds(
     final_positions: Mapping[str, tuple[float, float]],
     folder_rect_data: FolderRectData,
-) -> tuple[float, float]:
+    node_visual_data: Mapping[object, NodeVisualData],
+) -> LayoutBounds:
     min_x: float | None = None
     max_x: float | None = None
     min_y: float | None = None
     max_y: float | None = None
 
-    for x_coord, y_coord in final_positions.values():
-        min_x = x_coord if min_x is None else min(min_x, x_coord)
-        max_x = x_coord if max_x is None else max(max_x, x_coord)
-        min_y = y_coord if min_y is None else min(min_y, y_coord)
-        max_y = y_coord if max_y is None else max(max_y, y_coord)
+    for node_id, (x_coord, y_coord) in final_positions.items():
+        node_radius = _node_visual_radius_units(
+            _get_node_visual_size(node_visual_data, node_id)
+        )
+        min_x = (
+            x_coord - node_radius
+            if min_x is None
+            else min(min_x, x_coord - node_radius)
+        )
+        max_x = (
+            x_coord + node_radius
+            if max_x is None
+            else max(max_x, x_coord + node_radius)
+        )
+        min_y = (
+            y_coord - node_radius
+            if min_y is None
+            else min(min_y, y_coord - node_radius)
+        )
+        max_y = (
+            y_coord + node_radius
+            if max_y is None
+            else max(max_y, y_coord + node_radius)
+        )
 
     for center_x, center_y, width, height in zip(
         folder_rect_data["x"],
@@ -769,38 +931,46 @@ def _measure_layout_bounds(
         max_y = rect_max_y if max_y is None else max(max_y, rect_max_y)
 
     if min_x is None or max_x is None or min_y is None or max_y is None:
-        return (0.0, 0.0)
+        return LayoutBounds(min_x=0.0, max_x=0.0, min_y=0.0, max_y=0.0)
 
-    return (max_x - min_x, max_y - min_y)
+    return LayoutBounds(min_x=min_x, max_x=max_x, min_y=min_y, max_y=max_y)
 
 
 def _build_plot_dimensions(render_data: PreparedBokehRender) -> PlotDimensions:
-    layout_width, layout_height = _measure_layout_bounds(
+    layout_bounds = _measure_layout_bounds(
         render_data.final_positions,
         render_data.folder_rect_data,
+        render_data.node_visual_data,
     )
     node_count = len(render_data.final_positions)
     folder_count = len(render_data.folder_rect_data["name"])
+    max_node_size = max(
+        (visual_data["viz_size"] for visual_data in render_data.node_visual_data.values()),
+        default=MIN_NODE_SIZE,
+    )
+    node_size_budget = max(max_node_size - MIN_NODE_SIZE, 0)
     complexity_width = (
         BASE_PLOT_WIDTH
-        + max(node_count - 12, 0) * 28
-        + max(folder_count - 4, 0) * 120
+        + max(node_count - 12, 0) * 18
+        + max(folder_count - 4, 0) * 90
+        + node_size_budget * 6
     )
     complexity_height = (
         BASE_PLOT_HEIGHT
-        + max(node_count - 12, 0) * 20
-        + max(folder_count - 4, 0) * 90
+        + max(node_count - 12, 0) * 14
+        + max(folder_count - 4, 0) * 72
+        + node_size_budget * 5
     )
     width = math.ceil(
         _clamp_float(
-            max(layout_width * PLOT_PIXELS_PER_LAYOUT_UNIT, float(complexity_width)),
+            max(layout_bounds.width * PLOT_PIXELS_PER_LAYOUT_UNIT, float(complexity_width)),
             BASE_PLOT_WIDTH,
             MAX_PLOT_WIDTH,
         )
     )
     height = math.ceil(
         _clamp_float(
-            max(layout_height * PLOT_PIXELS_PER_LAYOUT_UNIT, float(complexity_height)),
+            max(layout_bounds.height * PLOT_PIXELS_PER_LAYOUT_UNIT, float(complexity_height)),
             BASE_PLOT_HEIGHT,
             MAX_PLOT_HEIGHT,
         )
@@ -808,24 +978,74 @@ def _build_plot_dimensions(render_data: PreparedBokehRender) -> PlotDimensions:
     return PlotDimensions(width=width, height=height)
 
 
+def _build_plot_ranges(
+    render_data: PreparedBokehRender,
+    plot_dimensions: PlotDimensions,
+) -> tuple[Range1d, Range1d]:
+    layout_bounds = _measure_layout_bounds(
+        render_data.final_positions,
+        render_data.folder_rect_data,
+        render_data.node_visual_data,
+    )
+    if layout_bounds.width <= 0.0 and layout_bounds.height <= 0.0:
+        return (Range1d(start=-2.0, end=2.0), Range1d(start=-2.0, end=2.0))
+
+    padding_x = max(
+        INITIAL_VIEW_MIN_PADDING_UNITS,
+        LAYOUT_VIEWPORT_PADDING_UNITS,
+        layout_bounds.width * INITIAL_VIEW_PADDING_FRACTION,
+    )
+    padding_y = max(
+        INITIAL_VIEW_MIN_PADDING_UNITS,
+        LAYOUT_VIEWPORT_PADDING_UNITS,
+        layout_bounds.height * INITIAL_VIEW_PADDING_FRACTION,
+    )
+    padded_width = max(layout_bounds.width + 2.0 * padding_x, 1.0)
+    padded_height = max(layout_bounds.height + 2.0 * padding_y, 1.0)
+    plot_aspect_ratio = max(
+        float(plot_dimensions.width) / max(float(plot_dimensions.height), 1.0),
+        1e-6,
+    )
+    data_aspect_ratio = padded_width / padded_height
+
+    half_width = padded_width / 2.0
+    half_height = padded_height / 2.0
+    center_x = (layout_bounds.min_x + layout_bounds.max_x) / 2.0
+    center_y = (layout_bounds.min_y + layout_bounds.max_y) / 2.0
+
+    if data_aspect_ratio > plot_aspect_ratio:
+        half_height = (padded_width / plot_aspect_ratio) / 2.0
+    else:
+        half_width = (padded_height * plot_aspect_ratio) / 2.0
+
+    half_width *= INITIAL_VIEW_SAFETY_SCALE
+    half_height *= INITIAL_VIEW_SAFETY_SCALE
+    return (
+        Range1d(start=center_x - half_width, end=center_x + half_width),
+        Range1d(start=center_y - half_height, end=center_y + half_height),
+    )
+
+
 def _build_bokeh_layout(
     graph: nx.DiGraph,
     layout: str,
+    node_visual_data: Mapping[object, NodeVisualData],
 ) -> tuple[dict[str, tuple[float, float]], FolderRectData]:
     if layout != "constrained":
         raise ValueError(f"Unsupported Bokeh layout '{layout}'. Supported layouts: constrained.")
 
-    return _create_constrained_layout(graph)
+    return _create_constrained_layout(graph, node_visual_data)
 
 
 def _build_node_visual_data(graph: nx.DiGraph) -> dict[object, NodeVisualData]:
     degrees = dict(graph.degree())
+    node_count = graph.number_of_nodes()
     visual_data: dict[object, NodeVisualData] = {}
 
     for node_id in sorted(graph.nodes(), key=str):
         node_data = graph.nodes[node_id]
         current_degree = degrees.get(node_id, 0)
-        calculated_size = MIN_NODE_SIZE + current_degree * 10
+        calculated_size = _calculate_node_visual_size(current_degree, node_count)
 
         visual_data[node_id] = {
             "viz_size": calculated_size,
@@ -872,6 +1092,65 @@ def _to_int(value: object) -> int:
     return 0
 
 
+def _build_edge_visual_style(graph: nx.DiGraph) -> EdgeVisualStyle:
+    node_count = graph.number_of_nodes()
+    edge_count = graph.number_of_edges()
+    if (
+        node_count >= COMPACT_GRAPH_NODE_COUNT_THRESHOLD
+        or edge_count >= COMPACT_EDGE_COUNT_THRESHOLD
+    ):
+        return EdgeVisualStyle(
+            line_alpha=0.12,
+            line_width=0.9,
+            arrow_alpha=0.18,
+            arrow_line_width=1.0,
+            arrow_head_size=8,
+        )
+    if (
+        node_count >= MEDIUM_GRAPH_NODE_COUNT_THRESHOLD
+        or edge_count >= MEDIUM_EDGE_COUNT_THRESHOLD
+    ):
+        return EdgeVisualStyle(
+            line_alpha=0.18,
+            line_width=1.0,
+            arrow_alpha=0.24,
+            arrow_line_width=1.2,
+            arrow_head_size=9,
+        )
+    return EdgeVisualStyle(
+        line_alpha=0.28,
+        line_width=1.2,
+        arrow_alpha=0.32,
+        arrow_line_width=1.4,
+        arrow_head_size=10,
+    )
+
+
+def _build_render_policy(graph: nx.DiGraph) -> RenderPolicy:
+    node_count = graph.number_of_nodes()
+    edge_count = graph.number_of_edges()
+    dense_graph = (
+        node_count >= LOD_RENDER_NODE_THRESHOLD
+        or edge_count >= LOD_RENDER_EDGE_THRESHOLD
+    )
+    return RenderPolicy(
+        # Use a single canvas backend so browser rendering stays consistent.
+        output_backend="canvas",
+        show_arrows=not (
+            node_count >= ARROW_RENDER_NODE_THRESHOLD
+            or edge_count >= ARROW_RENDER_EDGE_THRESHOLD
+        ),
+        enable_node_dragging=not (
+            node_count >= NODE_DRAGGING_NODE_THRESHOLD
+            or edge_count >= NODE_DRAGGING_EDGE_THRESHOLD
+        ),
+        lod_threshold=1 if dense_graph else None,
+        lod_factor=LOD_FACTOR,
+        lod_interval=LOD_INTERVAL_MS,
+        lod_timeout=LOD_TIMEOUT_MS,
+    )
+
+
 def _build_toolbar_stylesheet() -> InlineStyleSheet:
     return InlineStyleSheet(
         css=(
@@ -904,11 +1183,14 @@ def _build_toolbar_stylesheet() -> InlineStyleSheet:
 def _create_bokeh_plot(
     folder_rect_data: FolderRectData,
     plot_dimensions: PlotDimensions,
+    plot_ranges: tuple[Range1d, Range1d],
+    render_policy: RenderPolicy,
 ) -> tuple[figure_model, ColumnDataSource]:
     plot = figure_model(title="Interactive dependency graph")
-    plot.output_backend = "webgl"
+    plot.output_backend = render_policy.output_backend
     plot.width = plot_dimensions.width
     plot.height = plot_dimensions.height
+    plot.x_range, plot.y_range = plot_ranges
     plot.toolbar_location = "left"
     plot.toolbar_inner = True
     plot.toolbar_sticky = True
@@ -916,12 +1198,20 @@ def _create_bokeh_plot(
     plot.toolbar.logo = None
     plot.toolbar.autohide = False
     plot.toolbar.stylesheets = [_build_toolbar_stylesheet()]
+    plot.match_aspect = True
+    plot.lod_threshold = render_policy.lod_threshold
+    plot.lod_factor = render_policy.lod_factor
+    plot.lod_interval = render_policy.lod_interval
+    plot.lod_timeout = render_policy.lod_timeout
 
     pan_tool = PanTool()
+    zoom_tool = WheelZoomTool(maintain_focus=False, speed=1.1)
     hover_tool = HoverTool()
     plot.add_tools(
         pan_tool,
-        WheelZoomTool(),
+        zoom_tool,
+        ZoomInTool(),
+        ZoomOutTool(),
         BoxZoomTool(),
         ResetTool(),
         SaveTool(),
@@ -1011,14 +1301,25 @@ def _configure_node_renderer(graph_renderer: GraphRenderer) -> None:
     )
 
 
-def _configure_edge_renderer(graph_renderer: GraphRenderer) -> None:
+def _configure_edge_renderer(
+    graph_renderer: GraphRenderer,
+    edge_style: EdgeVisualStyle,
+) -> None:
     graph_renderer.edge_renderer.glyph = MultiLine(
         line_color="#CCCCCC",
-        line_alpha=0.8,
-        line_width=1.5,
+        line_alpha=edge_style.line_alpha,
+        line_width=edge_style.line_width,
     )
-    graph_renderer.edge_renderer.hover_glyph = MultiLine(line_color="orange", line_width=2)
-    graph_renderer.edge_renderer.selection_glyph = MultiLine(line_color="firebrick", line_width=2)
+    graph_renderer.edge_renderer.hover_glyph = MultiLine(
+        line_color="orange",
+        line_alpha=0.9,
+        line_width=2,
+    )
+    graph_renderer.edge_renderer.selection_glyph = MultiLine(
+        line_color="firebrick",
+        line_alpha=0.95,
+        line_width=2,
+    )
 
 
 def _build_arrow_source_data(
@@ -1050,16 +1351,24 @@ def _build_arrow_source_data(
 def _add_arrow_renderer(
     plot: figure_model,
     arrow_source_data: ArrowSourceData,
+    edge_style: EdgeVisualStyle,
 ) -> None:
     arrow_source = ColumnDataSource(data=arrow_source_data)
     arrow_renderer = Arrow(
-        end=OpenHead(line_color="gray", line_width=2, size=12),
+        end=OpenHead(
+            line_color="gray",
+            line_alpha=edge_style.arrow_alpha,
+            line_width=edge_style.arrow_line_width,
+            size=edge_style.arrow_head_size,
+        ),
         source=arrow_source,
         x_start="start_x",
         y_start="start_y",
         x_end="end_x",
         y_end="end_y",
     )
+    cast("Any", arrow_renderer).line_alpha = edge_style.arrow_alpha
+    cast("Any", arrow_renderer).line_width = edge_style.arrow_line_width
     plot.add_layout(arrow_renderer)
 
 
@@ -1171,13 +1480,14 @@ def _present_plot(plot: figure_model) -> str | None:
 
 def prepare_bokeh_render(graph: nx.DiGraph, layout: str) -> PreparedBokehRender:
     """Prepare layout and visual attributes for Bokeh rendering."""
-    final_positions, folder_rect_data = _build_bokeh_layout(graph, layout)
+    node_visual_data = _build_node_visual_data(graph)
+    final_positions, folder_rect_data = _build_bokeh_layout(graph, layout, node_visual_data)
 
     return PreparedBokehRender(
         final_positions=final_positions,
         folder_rect_data=folder_rect_data,
         arrow_source_data=_build_arrow_source_data(graph, final_positions),
-        node_visual_data=_build_node_visual_data(graph),
+        node_visual_data=node_visual_data,
     )
 
 
@@ -1185,9 +1495,14 @@ def draw_bokeh_graph(graph: nx.DiGraph, layout: str) -> str | None:
     """Render a dependency graph with Bokeh."""
     render_data = prepare_bokeh_render(graph, layout)
     graph_to_draw = _copy_graph_with_visual_data(graph, render_data.node_visual_data)
+    edge_style = _build_edge_visual_style(graph)
+    render_policy = _build_render_policy(graph)
+    plot_dimensions = _build_plot_dimensions(render_data)
     plot, _folder_source = _create_bokeh_plot(
         render_data.folder_rect_data,
-        _build_plot_dimensions(render_data),
+        plot_dimensions,
+        _build_plot_ranges(render_data, plot_dimensions),
+        render_policy,
     )
     graph_renderer = from_networkx(
         graph_to_draw,
@@ -1195,12 +1510,14 @@ def draw_bokeh_graph(graph: nx.DiGraph, layout: str) -> str | None:
     )
     _sync_node_coordinates(graph_renderer, render_data.final_positions)
     _configure_node_renderer(graph_renderer)
-    _configure_edge_renderer(graph_renderer)
-    _add_arrow_renderer(plot, render_data.arrow_source_data)
+    _configure_edge_renderer(graph_renderer, edge_style)
+    if render_policy.show_arrows:
+        _add_arrow_renderer(plot, render_data.arrow_source_data, edge_style)
     graph_renderer.selection_policy = NodesAndLinkedEdges()
     graph_renderer.inspection_policy = NodesAndLinkedEdges()
     _configure_hover(plot, graph_renderer)
-    _enable_node_dragging(plot, graph_renderer)
+    if render_policy.enable_node_dragging:
+        _enable_node_dragging(plot, graph_renderer)
     plot.renderers.append(graph_renderer)
 
     return _present_plot(plot)

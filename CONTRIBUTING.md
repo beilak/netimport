@@ -47,6 +47,7 @@ People *love* thorough bug reports. I'm not even kidding.
 
 We use `ruff` to format our code. Please run `poetry run ruff format .` before committing your changes.
 We also use `mypy` for static type checking. Please run `poetry run mypy .` to check for type errors.
+We also use `bandit` for security-focused static analysis. Please run `poetry run bandit -c pyproject.toml --severity-level all --confidence-level all --ignore-nosec -r netimport_lib` before submitting changes that touch production code.
 
 ## Setting up your development environment
 
@@ -66,7 +67,7 @@ poetry run pytest
 When you're ready to submit a pull request, please make sure you have done the following:
 
 1.  Run the test suite and ensure all tests pass.
-2.  Run the linter and type checker and ensure there are no errors.
+2.  Run the linter, type checker, and security scanner and ensure there are no errors.
 3.  Update the documentation if you have changed any APIs.
 4.  Write a clear and descriptive pull request message.
 

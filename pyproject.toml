@@ -62,6 +62,7 @@ packages = [{ include = "netimport_lib" }]
 mypy = "*"
 ruff = "*"
 pytest = "*"
+bandit = {extras = ["toml"], version = "^1.9.4"}
 
 [tool.netimport]
 ignored_dirs = ["venv", ".venv", "tests", "docs", "__pycache__", "node_modules", "migrations", ".git", ".hg"]
@@ -85,6 +86,93 @@ exclude = [
 [tool.pytest.ini_options]
 addopts = "-x"
 testpaths = ["tests"]
+
+[tool.bandit]
+# The distributable library is the security gate. Demo projects, tests, and
+# stubs stay outside the default repo-wide scan to keep findings actionable.
+exclude_dirs = [
+    ".git",
+    ".hg",
+    ".mypy_cache",
+    ".pytest_cache",
+    ".ruff_cache",
+    ".tox",
+    ".venv",
+    ".env",
+    "__pycache__",
+    "venv",
+    "tests",
+    "example",
+    "big_example",
+    "stubs",
+]
+include = ["*.py"]
+
+[tool.bandit.assert_used]
+skips = []
+
+[tool.bandit.hardcoded_tmp_directory]
+tmp_dirs = ["/tmp", "/var/tmp", "/dev/shm", "/run/shm", "/private/tmp"]
+
+[tool.bandit.shell_injection]
+subprocess = [
+    "subprocess.Popen",
+    "subprocess.call",
+    "subprocess.check_call",
+    "subprocess.check_output",
+    "subprocess.run",
+]
+shell = [
+    "os.system",
+    "os.popen",
+    "os.popen2",
+    "os.popen3",
+    "os.popen4",
+    "popen2.popen2",
+    "popen2.popen3",
+    "popen2.popen4",
+    "popen2.Popen3",
+    "popen2.Popen4",
+    "commands.getoutput",
+    "commands.getstatusoutput",
+    "subprocess.getoutput",
+    "subprocess.getstatusoutput",
+    "asyncio.create_subprocess_shell",
+]
+no_shell = [
+    "os.execl",
+    "os.execle",
+    "os.execlp",
+    "os.execlpe",
+    "os.execv",
+    "os.execve",
+    "os.execvp",
+    "os.execvpe",
+    "os.spawnl",
+    "os.spawnle",
+    "os.spawnlp",
+    "os.spawnlpe",
+    "os.spawnv",
+    "os.spawnve",
+    "os.spawnvp",
+    "os.spawnvpe",
+    "os.startfile",
+    "asyncio.create_subprocess_exec",
+]
+
+[tool.bandit.try_except_pass]
+check_typed_exception = true
+
+[tool.bandit.try_except_continue]
+check_typed_exception = true
+
+[tool.bandit.weak_cryptographic_key]
+weak_key_size_dsa_high = 2048
+weak_key_size_dsa_medium = 3072
+weak_key_size_rsa_high = 2048
+weak_key_size_rsa_medium = 3072
+weak_key_size_ec_high = 224
+weak_key_size_ec_medium = 256
 
 [tool.ruff]
 exclude = [

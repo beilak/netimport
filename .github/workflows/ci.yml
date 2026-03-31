@@ -26,6 +26,9 @@ jobs:
       - name: Lint with ruff
         run: poetry run ruff check netimport_lib tests
 
+      - name: Security scan with bandit
+        run: poetry run bandit -c pyproject.toml --severity-level all --confidence-level all --ignore-nosec -r netimport_lib
+
       - name: Type check with mypy
         run: poetry run mypy netimport_lib tests
 

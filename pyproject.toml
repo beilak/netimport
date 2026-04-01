@@ -62,7 +62,7 @@ packages = [{ include = "netimport_lib" }]
 mypy = "*"
 ruff = "*"
 pytest = "*"
-bandit = {extras = ["toml"], version = "^1.9.4"}
+bandit = {extras = ["toml"], version = ">=1.9, <2.0"}
 wemake-python-styleguide = {version = "1.6.1", python = ">=3.10,<4.0"}
 
 [tool.netimport]

@@ -7,14 +7,12 @@ from pathlib import Path
 import click
 import networkx as nx
 
-from netimport_lib import (
-    config_loader,
-    imports_reader,
-    project_file_reader,
-    summary_builder,
-    violations,
-)
+from netimport_lib import summary_builder
+from netimport_lib.config import loader as config_loader
 from netimport_lib.graph_builder import graph_builder
+from netimport_lib.policy import violations
+from netimport_lib.scanning import files as project_file_reader
+from netimport_lib.scanning import imports as imports_reader
 from netimport_lib.visualizer.registry import (
     DEFAULT_VISUALIZER,
     GRAPH_LAYOUT_CHOICES,

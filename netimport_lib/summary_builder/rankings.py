@@ -2,9 +2,9 @@
 
 from collections.abc import Sequence
 
-from netimport_lib.summary_builder_constants import _SummaryText
-from netimport_lib.summary_builder_models import _ProjectNodeSummary
-from netimport_lib.summary_builder_tables import _format_table
+from netimport_lib.summary_builder.constants import _SummaryText
+from netimport_lib.summary_builder.models import _ProjectNodeSummary
+from netimport_lib.summary_builder.tables import _format_table
 
 
 def _format_project_ranking(project_entries: Sequence[_ProjectNodeSummary]) -> list[str]:

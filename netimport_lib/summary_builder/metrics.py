@@ -5,18 +5,18 @@ from statistics import mean, median
 
 import networkx as nx
 
-from netimport_lib.summary_builder_constants import _SummaryText
-from netimport_lib.summary_builder_counts import (
+from netimport_lib.summary_builder.constants import _SummaryText
+from netimport_lib.summary_builder.counts import (
     _count_nodes_by_type,
     _count_unresolved_nodes,
 )
-from netimport_lib.summary_builder_models import (
+from netimport_lib.summary_builder.models import (
     _DegreeMetricSummary,
     _OverviewSummary,
     _ProjectMetricsSummary,
     _ProjectNodeSummary,
 )
-from netimport_lib.summary_builder_tables import _format_table
+from netimport_lib.summary_builder.tables import _format_table
 
 
 def _build_overview_summary(graph: nx.DiGraph) -> _OverviewSummary:

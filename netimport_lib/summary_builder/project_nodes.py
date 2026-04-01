@@ -7,8 +7,8 @@ from typing import cast
 
 import networkx as nx
 
-from netimport_lib.summary_builder_constants import NodeItem, _SummaryText
-from netimport_lib.summary_builder_models import _ProjectNodeSummary
+from netimport_lib.summary_builder.constants import NodeItem, _SummaryText
+from netimport_lib.summary_builder.models import _ProjectNodeSummary
 
 
 def _iter_node_items(graph: nx.DiGraph) -> Iterable[NodeItem]:

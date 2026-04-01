@@ -1,12 +1,14 @@
-"""Public Bokeh visualizer constants, part A."""
+"""Compatibility wrapper for public Bokeh visualizer constants."""
 
-from netimport_lib.visualizer.bokeh_plotter_constants import CONSTANTS
+from netimport_lib.visualizer.bokeh_plotter import (
+    public_constants_a as _public_constants_a,
+)
 
 
-ARROW_RENDER_EDGE_THRESHOLD = CONSTANTS.arrow_render_edge_threshold
-BASE_PLOT_HEIGHT = CONSTANTS.base_plot_height
-BOKEH_OUTPUT_PREFIX = CONSTANTS.bokeh_output_prefix
-COLOR_MAP = CONSTANTS.color_map
-HALF_DIVISOR = CONSTANTS.half_divisor
-MAX_NODE_SIZE = CONSTANTS.max_node_size
-MEDIUM_EDGE_STYLE = CONSTANTS.medium_edge_style
+ARROW_RENDER_EDGE_THRESHOLD = _public_constants_a.ARROW_RENDER_EDGE_THRESHOLD
+BASE_PLOT_HEIGHT = _public_constants_a.BASE_PLOT_HEIGHT
+BOKEH_OUTPUT_PREFIX = _public_constants_a.BOKEH_OUTPUT_PREFIX
+COLOR_MAP = _public_constants_a.COLOR_MAP
+HALF_DIVISOR = _public_constants_a.HALF_DIVISOR
+MAX_NODE_SIZE = _public_constants_a.MAX_NODE_SIZE
+MEDIUM_EDGE_STYLE = _public_constants_a.MEDIUM_EDGE_STYLE

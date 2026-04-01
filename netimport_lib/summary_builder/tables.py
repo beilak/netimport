@@ -2,7 +2,7 @@
 
 from collections.abc import Sequence
 
-from netimport_lib.summary_builder_constants import TableRow, _SummaryText
+from netimport_lib.summary_builder.constants import TableRow, _SummaryText
 
 
 def _build_section(title: str, description: str, body_lines: Sequence[str]) -> list[str]:

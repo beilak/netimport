@@ -1,11 +1,13 @@
-"""Public Bokeh visualizer constants, part B."""
+"""Compatibility wrapper for public Bokeh visualizer constants."""
 
-from netimport_lib.visualizer.bokeh_plotter_constants import CONSTANTS
+from netimport_lib.visualizer.bokeh_plotter import (
+    public_constants_b as _public_constants_b,
+)
 
 
-MEDIUM_GRAPH_MIN_NODE_SIZE = CONSTANTS.medium_graph_min_node_size
-MEDIUM_GRAPH_NODE_COUNT_THRESHOLD = CONSTANTS.medium_graph_node_count_threshold
-MIN_NODE_SIZE = CONSTANTS.min_node_size
-PLOT_PIXELS_PER_LAYOUT_UNIT = CONSTANTS.plot_pixels_per_layout_unit
-VIZ_SIZE_FIELD = CONSTANTS.viz_size_field
-ZERO_FLOAT = CONSTANTS.zero_float
+MEDIUM_GRAPH_MIN_NODE_SIZE = _public_constants_b.MEDIUM_GRAPH_MIN_NODE_SIZE
+MEDIUM_GRAPH_NODE_COUNT_THRESHOLD = _public_constants_b.MEDIUM_GRAPH_NODE_COUNT_THRESHOLD
+MIN_NODE_SIZE = _public_constants_b.MIN_NODE_SIZE
+PLOT_PIXELS_PER_LAYOUT_UNIT = _public_constants_b.PLOT_PIXELS_PER_LAYOUT_UNIT
+VIZ_SIZE_FIELD = _public_constants_b.VIZ_SIZE_FIELD
+ZERO_FLOAT = _public_constants_b.ZERO_FLOAT

@@ -2,8 +2,8 @@
 
 import networkx as nx
 
-from netimport_lib.summary_builder_constants import _SummaryText
-from netimport_lib.summary_builder_project_nodes import _get_node_type, _iter_node_items
+from netimport_lib.summary_builder.constants import _SummaryText
+from netimport_lib.summary_builder.project_nodes import _get_node_type, _iter_node_items
 
 
 def _count_nodes_by_type(graph: nx.DiGraph, node_type: str) -> int:

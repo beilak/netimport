@@ -5,7 +5,7 @@ from pathlib import Path
 
 import networkx as nx
 
-from netimport_lib.graph_builder.resolver_shared import NodeInfo, NodeTypes
+from netimport_lib.graph_builder.resolver.shared import NodeInfo, NodeTypes
 
 
 @dataclass(frozen=True, slots=True)

@@ -7,8 +7,9 @@ from dataclasses import asdict
 import click
 import networkx as nx
 
-from netimport_lib.summary_builder_constants import _SummaryText
-from netimport_lib.summary_builder_lists import (
+from netimport_lib.policy.violations import Violation, build_violations_payload
+from netimport_lib.summary_builder.constants import _SummaryText
+from netimport_lib.summary_builder.lists import (
     _build_external_entries,
     _build_unresolved_entries,
     _build_unresolved_import_payload,
@@ -16,19 +17,18 @@ from netimport_lib.summary_builder_lists import (
     _format_unresolved_entries,
     _format_violations,
 )
-from netimport_lib.summary_builder_metrics import (
+from netimport_lib.summary_builder.metrics import (
     _build_overview_summary,
     _build_project_metrics_summary,
     _format_overview,
     _format_project_metrics,
 )
-from netimport_lib.summary_builder_project_nodes import _build_project_entries
-from netimport_lib.summary_builder_rankings import (
+from netimport_lib.summary_builder.project_nodes import _build_project_entries
+from netimport_lib.summary_builder.rankings import (
     _build_ranked_project_files,
     _format_project_ranking,
 )
-from netimport_lib.summary_builder_tables import _build_section
-from netimport_lib.violations import Violation, build_violations_payload
+from netimport_lib.summary_builder.tables import _build_section
 
 
 def print_summary(graph: nx.DiGraph, violations: Sequence[Violation] = ()) -> None:

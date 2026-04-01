@@ -4,15 +4,15 @@ from collections.abc import Sequence
 
 import networkx as nx
 
-from netimport_lib.summary_builder_constants import TableRow, _SummaryText
-from netimport_lib.summary_builder_models import _SimpleNodeSummary
-from netimport_lib.summary_builder_project_nodes import (
+from netimport_lib.policy.violations import Violation
+from netimport_lib.summary_builder.constants import TableRow, _SummaryText
+from netimport_lib.summary_builder.models import _SimpleNodeSummary
+from netimport_lib.summary_builder.project_nodes import (
     _get_node_type,
     _get_str_attribute,
     _iter_node_items,
 )
-from netimport_lib.summary_builder_tables import _format_table
-from netimport_lib.violations import Violation
+from netimport_lib.summary_builder.tables import _format_table
 
 
 def _build_external_entries(graph: nx.DiGraph) -> list[_SimpleNodeSummary]:

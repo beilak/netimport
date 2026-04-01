@@ -15,7 +15,7 @@ from netimport_lib.graph_builder.graph_builder_nodes import (
     _NodeFilterConfig,
     add_project_file_nodes,
 )
-from netimport_lib.graph_builder.resolver_paths import normalize_path
+from netimport_lib.graph_builder.resolver.paths import normalize_path
 
 
 @dataclass(frozen=True, slots=True)

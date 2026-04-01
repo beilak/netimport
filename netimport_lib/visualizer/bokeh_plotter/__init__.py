@@ -10,18 +10,14 @@ import click
 from bokeh import io as bokeh_io
 from bokeh import models as bokeh_models
 
-from netimport_lib.visualizer import (
-    bokeh_plotter_render_ops as render_ops,
-)
-from netimport_lib.visualizer import (
-    bokeh_plotter_structure_ops as structure_ops,
-)
+from netimport_lib.visualizer.bokeh_plotter.ops import render as render_ops
+from netimport_lib.visualizer.bokeh_plotter.ops import structure as structure_ops
 
 
 if typing.TYPE_CHECKING:
     import networkx as nx
 
-    from netimport_lib.visualizer import bokeh_plotter_contracts as contracts
+    from netimport_lib.visualizer.bokeh_plotter import contracts
 
 
 def get_browser_controller(browser: str | None = None) -> object:

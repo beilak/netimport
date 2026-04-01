@@ -4,7 +4,7 @@ from pathlib import Path
 
 import networkx as nx
 
-from netimport_lib.graph_builder.resolver_shared import NodeTypes
+from netimport_lib.graph_builder.resolver.shared import NodeTypes
 
 
 class DisplayFolders:

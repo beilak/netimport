@@ -9,8 +9,8 @@ from netimport_lib.graph_builder.graph_builder_nodes import (
     _NodeFilterConfig,
     add_target_node_and_edge,
 )
-from netimport_lib.graph_builder.resolver_imports import resolve_import_string
-from netimport_lib.graph_builder.resolver_paths import normalize_path
+from netimport_lib.graph_builder.resolver.imports import resolve_import_string
+from netimport_lib.graph_builder.resolver.paths import normalize_path
 
 
 def normalize_file_imports_map(

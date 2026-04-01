@@ -187,15 +187,19 @@ class _CliSupport:
         selected_visualizer: GraphVisualizer,
         dependency_graph: nx.DiGraph,
         selected_layout: str,
+        *,
+        fail_on_render_error: bool,
     ) -> None:
         try:
             render_message = selected_visualizer.render(dependency_graph, selected_layout)
         except Exception as exc:
-            raise click.ClickException(
-                f"Failed to render graph with '{selected_visualizer.name}': {exc}"
-            ) from exc
+            error_message = f"Failed to render graph with '{selected_visualizer.name}': {exc}"
+            if fail_on_render_error:
+                raise click.ClickException(error_message) from exc
+            click.echo(f"Warning: {error_message}", err=True)
+            return
         if render_message:
-            click.echo(render_message)
+            click.echo(render_message, err=True)
 
 
 def _with_command_options(
@@ -340,13 +344,18 @@ def main(**command_options: object) -> None:
     selected_visualizer, selected_layout = _CliSupport.get_visualizer_selection(cli_command)
     dependency_graph, violations = _CliSupport.run_analysis(cli_command)
 
-    if selected_visualizer is not None and selected_layout is not None:
-        _CliSupport.render_graph(selected_visualizer, dependency_graph, selected_layout)
     if cli_command.show_console_summary:
         if cli_command.summary_format == "json":
             summary_builder.print_json_summary(dependency_graph, violations)
         else:
             summary_builder.print_summary(dependency_graph, violations)
+    if selected_visualizer is not None and selected_layout is not None:
+        _CliSupport.render_graph(
+            selected_visualizer,
+            dependency_graph,
+            selected_layout,
+            fail_on_render_error=not cli_command.show_console_summary,
+        )
     if cli_command.fail_on_violation and violations:
         raise click.exceptions.Exit(1)
 

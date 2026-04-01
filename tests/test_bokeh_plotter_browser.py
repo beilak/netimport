@@ -4,6 +4,7 @@ from pathlib import Path
 from _pytest.monkeypatch import MonkeyPatch
 
 from netimport_lib.visualizer import bokeh_plotter
+from netimport_lib.visualizer.bokeh_plotter_public_constants_a import BOKEH_OUTPUT_PREFIX
 from tests.bokeh_plotter_support.browser import (
     ControllerFactory,
     MacOSXOSAScript,
@@ -12,6 +13,9 @@ from tests.bokeh_plotter_support.browser import (
 )
 from tests.bokeh_plotter_support.graphs import build_sample_graph
 from tests.bokeh_plotter_support.names import BokehNames
+
+
+_HTML_DOCUMENT = "<html></html>"
 
 
 def test_manual_message_when_auto_open_skipped(
@@ -48,8 +52,8 @@ def test_uses_browser_controller_for_html(
     monkeypatch: MonkeyPatch,
     tmp_path: Path,
 ) -> None:
-    output_path = tmp_path / f"{bokeh_plotter.BOKEH_OUTPUT_PREFIX}graph.html"
-    output_path.write_text("<html></html>", encoding=BokehNames.utf8)
+    output_path = tmp_path / f"{BOKEH_OUTPUT_PREFIX}graph.html"
+    output_path.write_text(_HTML_DOCUMENT, encoding=BokehNames.utf8)
     calls: list[tuple[str, int, bool]] = []
     controller_factory = ControllerFactory(RecordingController(calls))
 
@@ -70,8 +74,8 @@ def test_uses_webbrowser_controller_on_macos(
     monkeypatch: MonkeyPatch,
     tmp_path: Path,
 ) -> None:
-    output_path = tmp_path / f"{bokeh_plotter.BOKEH_OUTPUT_PREFIX}graph.html"
-    output_path.write_text("<html></html>", encoding=BokehNames.utf8)
+    output_path = tmp_path / f"{BOKEH_OUTPUT_PREFIX}graph.html"
+    output_path.write_text(_HTML_DOCUMENT, encoding=BokehNames.utf8)
     calls: list[tuple[str, int, bool]] = []
     open_recorder = OpenCallRecorder(calls)
     controller_factory = ControllerFactory(webbrowser)
@@ -123,9 +127,10 @@ def test_manual_message_for_unreliable_controller(
     monkeypatch: MonkeyPatch,
     tmp_path: Path,
 ) -> None:
-    output_path = tmp_path / f"{bokeh_plotter.BOKEH_OUTPUT_PREFIX}graph.html"
-    output_path.write_text("<html></html>", encoding=BokehNames.utf8)
-    controller_factory = ControllerFactory(MacOSXOSAScript())
+    output_path = tmp_path / f"{BOKEH_OUTPUT_PREFIX}graph.html"
+    output_path.write_text(_HTML_DOCUMENT, encoding=BokehNames.utf8)
+    controller = MacOSXOSAScript()
+    controller_factory = ControllerFactory(controller)
 
     monkeypatch.setattr(bokeh_plotter, BokehNames.save_plot_attr, lambda _plot: output_path)
     monkeypatch.setattr(
@@ -133,12 +138,32 @@ def test_manual_message_for_unreliable_controller(
         BokehNames.get_browser_controller_attr,
         controller_factory,
     )
+    monkeypatch.setattr(bokeh_plotter, "_open_with_platform_default_app", lambda _path: True)
 
     message = bokeh_plotter.draw_bokeh_graph(build_sample_graph(), BokehNames.constrained_layout)
 
-    assert message == (
-        "Interactive dependency graph saved to "
-        f"{output_path}. Automatic browser launch is unavailable in this environment; "
-        "open the file manually."
-    )
+    assert message is None
+    assert controller.open_calls == 0
 
+
+def test_last_resort_uses_unreliable_controller(
+    monkeypatch: MonkeyPatch,
+    tmp_path: Path,
+) -> None:
+    output_path = tmp_path / f"{BOKEH_OUTPUT_PREFIX}graph.html"
+    output_path.write_text(_HTML_DOCUMENT, encoding=BokehNames.utf8)
+    controller = MacOSXOSAScript()
+    controller_factory = ControllerFactory(controller)
+
+    monkeypatch.setattr(bokeh_plotter, BokehNames.save_plot_attr, lambda _plot: output_path)
+    monkeypatch.setattr(
+        bokeh_plotter,
+        BokehNames.get_browser_controller_attr,
+        controller_factory,
+    )
+    monkeypatch.setattr(bokeh_plotter, "_open_with_platform_default_app", lambda _path: False)
+
+    message = bokeh_plotter.draw_bokeh_graph(build_sample_graph(), BokehNames.constrained_layout)
+
+    assert message is None
+    assert controller.open_calls == 1

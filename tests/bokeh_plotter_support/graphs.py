@@ -164,4 +164,3 @@ def build_hub_graph(leaf_count: int) -> nx.DiGraph:
         )
         graph.add_edge(BokehNames.pkg_hub_file, node_id)
     return graph
-

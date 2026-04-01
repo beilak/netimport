@@ -2,7 +2,7 @@ from typing import TYPE_CHECKING, cast
 
 from bokeh import models as bokeh_models
 
-from netimport_lib.visualizer import bokeh_plotter
+from netimport_lib.visualizer.bokeh_plotter_contracts import PreparedBokehRender
 from tests.bokeh_plotter_support.bounds import build_render_bounds
 from tests.bokeh_plotter_support.geometry import node_visual_fits_inside_rect, point_is_inside_rect
 
@@ -12,7 +12,7 @@ if TYPE_CHECKING:
 
 
 def assert_nodes_fit_folder(
-    render_data: bokeh_plotter.PreparedBokehRender,
+    render_data: PreparedBokehRender,
     node_ids: tuple[str, ...],
     own_rect: tuple[float, float, float, float],
     other_rect: tuple[float, float, float, float],
@@ -50,11 +50,10 @@ def assert_plot_covers_bounds(
 
 def assert_render_covers_bounds(
     plot: "figure_model",
-    render_data: bokeh_plotter.PreparedBokehRender,
+    render_data: PreparedBokehRender,
 ) -> None:
     assert_plot_covers_bounds(plot, build_render_bounds(render_data))
 
 
 def hover_tool_for(plot: "figure_model") -> bokeh_models.HoverTool:
     return cast("bokeh_models.HoverTool", plot.select_one({"type": bokeh_models.HoverTool}))
-

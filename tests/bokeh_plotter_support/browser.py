@@ -32,8 +32,9 @@ class ControllerFactory:
 class MacOSXOSAScript:
     def __init__(self) -> None:
         self.open_calls = 0
+        self.last_open_request: tuple[str, int, bool] | None = None
 
-    def open(self, _url: str, _new: int, _autoraise: bool) -> bool:
+    def open(self, url: str, new: int, autoraise: bool) -> bool:
+        self.last_open_request = (url, new, autoraise)
         self.open_calls += 1
         return True
-

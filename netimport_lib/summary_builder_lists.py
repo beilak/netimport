@@ -87,10 +87,10 @@ def _format_violations(violations: Sequence[Violation]) -> list[str]:
 
 
 def _build_ranked_simple_rows(entries: Sequence[_SimpleNodeSummary]) -> list[TableRow]:
-    return [
-        (str(index), entry.display_name)
-        for index, entry in enumerate(entries, start=1)
-    ]
+    rows: list[TableRow] = []
+    for index, entry in enumerate(entries, start=1):
+        rows.append((str(index), entry.display_name))
+    return rows
 
 
 def _build_unresolved_import_payload(

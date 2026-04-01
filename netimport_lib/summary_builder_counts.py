@@ -8,9 +8,7 @@ from netimport_lib.summary_builder_project_nodes import _get_node_type, _iter_no
 
 def _count_nodes_by_type(graph: nx.DiGraph, node_type: str) -> int:
     return sum(
-        1
-        for _, node_data in _iter_node_items(graph)
-        if _get_node_type(node_data) == node_type
+        1 for _, node_data in _iter_node_items(graph) if _get_node_type(node_data) == node_type
     )
 
 

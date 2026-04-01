@@ -1,9 +1,13 @@
-from netimport_lib.visualizer import bokeh_plotter
+from netimport_lib.visualizer.bokeh_plotter_contracts import FolderRectData, PreparedBokehRender
+from netimport_lib.visualizer.bokeh_plotter_public_constants_b import (
+    PLOT_PIXELS_PER_LAYOUT_UNIT,
+    ZERO_FLOAT,
+)
 from tests.bokeh_plotter_support.rendering import half
 
 
 def build_rect_map(
-    folder_rect_data: "bokeh_plotter.FolderRectData",
+    folder_rect_data: FolderRectData,
 ) -> dict[str, tuple[float, float, float, float]]:
     return {
         name: (x_coord, y_coord, width, height)
@@ -23,7 +27,7 @@ def point_is_inside_rect(
     y_coord: float,
     rect: tuple[float, float, float, float],
     *,
-    margin: float = bokeh_plotter.ZERO_FLOAT,
+    margin: float = ZERO_FLOAT,
 ) -> bool:
     rect_x, rect_y, rect_width, rect_height = rect
     return (
@@ -33,14 +37,14 @@ def point_is_inside_rect(
 
 
 def node_radius(
-    render_data: bokeh_plotter.PreparedBokehRender,
+    render_data: PreparedBokehRender,
     node_id: str,
 ) -> float:
-    return node_visual_size(render_data, node_id) / bokeh_plotter.PLOT_PIXELS_PER_LAYOUT_UNIT / 2
+    return node_visual_size(render_data, node_id) / PLOT_PIXELS_PER_LAYOUT_UNIT / 2
 
 
 def node_visual_size(
-    render_data: bokeh_plotter.PreparedBokehRender,
+    render_data: PreparedBokehRender,
     node_id: str,
 ) -> int:
     return render_data.node_visual_data[node_id]["viz_size"]
@@ -48,7 +52,7 @@ def node_visual_size(
 
 def node_visual_fits_inside_rect(
     node_id: str,
-    render_data: bokeh_plotter.PreparedBokehRender,
+    render_data: PreparedBokehRender,
     rect: tuple[float, float, float, float],
 ) -> bool:
     node_x, node_y = render_data.final_positions[node_id]
@@ -71,7 +75,7 @@ def rect_bounds(rect: tuple[float, ...]) -> tuple[float, float, float, float]:
 
 
 def node_bounds(
-    render_data: bokeh_plotter.PreparedBokehRender,
+    render_data: PreparedBokehRender,
     node_id: str,
     position: tuple[float, float],
 ) -> tuple[float, float, float, float]:

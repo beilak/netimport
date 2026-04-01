@@ -44,4 +44,3 @@ def draw_and_capture_plot(
     shown_plots = capture_rendered_plots(monkeypatch)
     bokeh_plotter.draw_bokeh_graph(graph, BokehNames.constrained_layout)
     return first_rendered_plot(shown_plots), shown_plots
-

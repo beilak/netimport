@@ -2,6 +2,7 @@ import networkx as nx
 import pytest
 
 from netimport_lib.visualizer import bokeh_plotter
+from netimport_lib.visualizer.bokeh_plotter_public_constants_a import COLOR_MAP
 from tests.bokeh_plotter_support.graphs import build_sample_graph
 from tests.bokeh_plotter_support.names import BokehNames
 
@@ -20,7 +21,7 @@ def test_prepare_render_visual_data() -> None:
     ) == (2, graph.number_of_edges(), graph.number_of_edges())
     assert render_data.node_visual_data[BokehNames.pkg_sub_b_file] == {
         "viz_size": 26,
-        "viz_color": bokeh_plotter.COLOR_MAP[BokehNames.unresolved_type],
+        "viz_color": COLOR_MAP[BokehNames.unresolved_type],
         "viz_label": BokehNames.b_file_label,
         "viz_degree": 1,
         "viz_type": BokehNames.unresolved_type,
@@ -98,4 +99,3 @@ def test_prepare_render_is_deterministic() -> None:
     assert first_render.final_positions == second_render.final_positions
     assert first_render.folder_rect_data == second_render.folder_rect_data
     assert first_render.arrow_source_data == second_render.arrow_source_data
-

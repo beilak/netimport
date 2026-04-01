@@ -1,4 +1,6 @@
 from netimport_lib.visualizer import bokeh_plotter
+from netimport_lib.visualizer.bokeh_plotter_public_constants_a import MAX_NODE_SIZE
+from netimport_lib.visualizer.bokeh_plotter_public_constants_b import MIN_NODE_SIZE
 from tests.bokeh_plotter_support.bounds import (
     folder_rect,
     rect_width_per_node_scale,
@@ -80,5 +82,5 @@ def test_caps_high_degree_nodes() -> None:
     hub_visual_data = render_data.node_visual_data[BokehNames.pkg_hub_file]
 
     assert hub_visual_data["viz_degree"] == BokehNames.expected_hub_degree
-    assert node_visual_size(render_data, BokehNames.pkg_hub_file) <= bokeh_plotter.MAX_NODE_SIZE
-    assert node_visual_size(render_data, BokehNames.pkg_hub_file) > bokeh_plotter.MIN_NODE_SIZE
+    assert node_visual_size(render_data, BokehNames.pkg_hub_file) <= MAX_NODE_SIZE
+    assert node_visual_size(render_data, BokehNames.pkg_hub_file) > MIN_NODE_SIZE

@@ -5,6 +5,7 @@ from _pytest.monkeypatch import MonkeyPatch
 from bokeh.models.renderers import GraphRenderer
 
 from netimport_lib.visualizer import bokeh_plotter
+from netimport_lib.visualizer.bokeh_plotter_public_constants_a import MEDIUM_EDGE_STYLE
 from tests.bokeh_plotter_support.graphs import build_hub_graph, build_single_folder_graph
 from tests.bokeh_plotter_support.names import BokehNames
 from tests.bokeh_plotter_support.plot_assertions import (
@@ -67,7 +68,7 @@ def test_large_graph_uses_lighter_edge_style(monkeypatch: MonkeyPatch) -> None:
 
     assert_large_graph_edge_contract(shown_plot)
     assert graph_renderer.edge_renderer.glyph.line_alpha == pytest.approx(
-        bokeh_plotter.MEDIUM_EDGE_STYLE.line_alpha,
+        MEDIUM_EDGE_STYLE.line_alpha,
     )
     assert graph_renderer.edge_renderer.glyph.line_width == pytest.approx(1.0)
 

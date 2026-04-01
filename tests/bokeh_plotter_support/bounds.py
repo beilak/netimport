@@ -1,6 +1,7 @@
 import math
 
-from netimport_lib.visualizer import bokeh_plotter
+from netimport_lib.visualizer.bokeh_plotter_contracts import PreparedBokehRender
+from netimport_lib.visualizer.bokeh_plotter_public_constants_b import ZERO_FLOAT
 from tests.bokeh_plotter_support.geometry import (
     build_rect_map,
     node_bounds,
@@ -33,15 +34,15 @@ def normalize_bounds(
     bounds: tuple[float | None, ...],
 ) -> tuple[float, float, float, float]:
     return (
-        bokeh_plotter.ZERO_FLOAT if bounds[0] is None else bounds[0],
-        bokeh_plotter.ZERO_FLOAT if bounds[1] is None else bounds[1],
-        bokeh_plotter.ZERO_FLOAT if bounds[2] is None else bounds[2],
-        bokeh_plotter.ZERO_FLOAT if bounds[3] is None else bounds[3],
+        ZERO_FLOAT if bounds[0] is None else bounds[0],
+        ZERO_FLOAT if bounds[1] is None else bounds[1],
+        ZERO_FLOAT if bounds[2] is None else bounds[2],
+        ZERO_FLOAT if bounds[3] is None else bounds[3],
     )
 
 
 def build_render_bounds(
-    render_data: bokeh_plotter.PreparedBokehRender,
+    render_data: PreparedBokehRender,
 ) -> tuple[float, float, float, float]:
     bounds: tuple[float | None, ...] = (
         None,
@@ -89,7 +90,7 @@ def rect_width_per_node_scale(rect: tuple[float, float, float, float], node_coun
 
 
 def folder_rect(
-    render_data: bokeh_plotter.PreparedBokehRender,
+    render_data: PreparedBokehRender,
     folder_name: str,
 ) -> tuple[float, float, float, float]:
     return build_rect_map(render_data.folder_rect_data)[folder_name]

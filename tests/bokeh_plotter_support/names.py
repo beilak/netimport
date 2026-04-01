@@ -1,4 +1,16 @@
-from netimport_lib.visualizer import bokeh_plotter
+from netimport_lib.visualizer.bokeh_plotter_public_constants_a import (
+    ARROW_RENDER_EDGE_THRESHOLD,
+    BASE_PLOT_HEIGHT,
+    HALF_DIVISOR,
+    MAX_NODE_SIZE,
+)
+from netimport_lib.visualizer.bokeh_plotter_public_constants_b import (
+    MEDIUM_GRAPH_MIN_NODE_SIZE,
+    MEDIUM_GRAPH_NODE_COUNT_THRESHOLD,
+    MIN_NODE_SIZE,
+    VIZ_SIZE_FIELD,
+    ZERO_FLOAT,
+)
 
 
 class BokehNames:
@@ -24,17 +36,14 @@ class BokehNames:
     save_plot_attr = "_save_plot"
     open_saved_plot_attr = "_open_saved_plot"
     get_browser_controller_attr = "get_browser_controller"
-    viz_size_field = bokeh_plotter.VIZ_SIZE_FIELD
-    half_divisor = bokeh_plotter.HALF_DIVISOR
-    zero_float = bokeh_plotter.ZERO_FLOAT
-    large_graph_node_count = bokeh_plotter.MEDIUM_GRAPH_NODE_COUNT_THRESHOLD // 5
-    high_degree_leaf_count = bokeh_plotter.MAX_NODE_SIZE - bokeh_plotter.MIN_NODE_SIZE
+    viz_size_field = VIZ_SIZE_FIELD
+    half_divisor = HALF_DIVISOR
+    zero_float = ZERO_FLOAT
+    large_graph_node_count = MEDIUM_GRAPH_NODE_COUNT_THRESHOLD // 5
+    high_degree_leaf_count = MAX_NODE_SIZE - MIN_NODE_SIZE
     expected_hub_degree = high_degree_leaf_count + 1
-    chain_comparison_node_count = bokeh_plotter.MEDIUM_GRAPH_NODE_COUNT_THRESHOLD // 6
+    chain_comparison_node_count = MEDIUM_GRAPH_NODE_COUNT_THRESHOLD // 6
     hub_comparison_leaf_count = chain_comparison_node_count - 1
-    range_coverage_leaf_count = bokeh_plotter.ARROW_RENDER_EDGE_THRESHOLD // 8 + 1
-    light_edge_leaf_count = bokeh_plotter.ARROW_RENDER_EDGE_THRESHOLD
-    wheel_speed_denominator = (
-        bokeh_plotter.BASE_PLOT_HEIGHT - bokeh_plotter.MEDIUM_GRAPH_MIN_NODE_SIZE * 10
-    )
-
+    range_coverage_leaf_count = ARROW_RENDER_EDGE_THRESHOLD // 8 + 1
+    light_edge_leaf_count = ARROW_RENDER_EDGE_THRESHOLD
+    wheel_speed_denominator = BASE_PLOT_HEIGHT - MEDIUM_GRAPH_MIN_NODE_SIZE * 10

@@ -21,18 +21,20 @@ from . import *
 
     imports = get_imported_modules_as_strings(str(dummy_file))
 
-    assert "os" in imports
-    assert "sys" in imports
-    assert "collections.defaultdict" in imports
-    assert ".sibling" in imports
-    assert ".module.name" in imports
-    assert "..package.another_name" in imports
-    assert "package.module" in imports
-    assert "package" in imports
-    assert "." in imports
+    assert set(imports) == {
+        "os",
+        "sys",
+        "collections.defaultdict",
+        ".sibling",
+        ".module.name",
+        "..package.another_name",
+        "package.module",
+        "package",
+        ".",
+    }
 
 
-def test_get_imported_modules_skips_type_checking_imports_by_default(tmp_path: Path) -> None:
+def test_skip_type_checking_by_default(tmp_path: Path) -> None:
     dummy_file = tmp_path / "dummy_type_checking.py"
     dummy_file.write_text(
         """
@@ -57,7 +59,7 @@ if typing.TYPE_CHECKING:
     assert "app.models" not in imports
 
 
-def test_get_imported_modules_can_include_type_checking_imports(tmp_path: Path) -> None:
+def test_get_imports_include_type_checking(tmp_path: Path) -> None:
     dummy_file = tmp_path / "dummy_type_checking.py"
     dummy_file.write_text(
         """

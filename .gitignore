@@ -592,3 +592,5 @@ cython_debug/
 .idea
 
 .python-version
+
+.ruff_cache

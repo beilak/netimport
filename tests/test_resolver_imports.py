@@ -3,12 +3,17 @@ from pathlib import Path
 
 import pytest
 
-from netimport_lib.graph_builder.resolver_imports import (
-    NodeInfo,
-    NodeType,
-    normalize_path,
-    resolve_import_string,
-)
+from netimport_lib.graph_builder.resolver_imports import resolve_import_string
+from netimport_lib.graph_builder.resolver_paths import normalize_path
+from netimport_lib.graph_builder.resolver_shared import NodeInfo, NodeType
+
+
+MAIN_FILE = "main.py"
+PROJECT_FILE_TYPE: NodeType = "project_file"
+PACKAGE_INIT_FILE = "pkg/__init__.py"
+PACKAGE_MODULE_FILE = "pkg/module.py"
+PACKAGE_HELPER_FILE = "pkg/helper.py"
+SUBPACKAGE_MODULE_FILE = "pkg/sub/module.py"
 
 
 @dataclass(frozen=True, slots=True)
@@ -37,70 +42,70 @@ def _normalized_project_files(project_root: Path, *relative_paths: str) -> set[s
     [
         _ProjectResolutionCase(
             import_str="helper",
-            source_file="main.py",
-            project_files=("main.py", "helper.py"),
+            source_file=MAIN_FILE,
+            project_files=(MAIN_FILE, "helper.py"),
             expected_relative_id="helper.py",
-            expected_type="project_file",
+            expected_type=PROJECT_FILE_TYPE,
         ),
         _ProjectResolutionCase(
             import_str="pkg.missing_export",
-            source_file="main.py",
-            project_files=("main.py", "pkg/__init__.py"),
-            expected_relative_id="pkg/__init__.py",
-            expected_type="project_file",
+            source_file=MAIN_FILE,
+            project_files=(MAIN_FILE, PACKAGE_INIT_FILE),
+            expected_relative_id=PACKAGE_INIT_FILE,
+            expected_type=PROJECT_FILE_TYPE,
         ),
         _ProjectResolutionCase(
             import_str=".helper",
-            source_file="pkg/module.py",
-            project_files=("pkg/module.py", "pkg/helper.py"),
-            expected_relative_id="pkg/helper.py",
-            expected_type="project_file",
+            source_file=PACKAGE_MODULE_FILE,
+            project_files=(PACKAGE_MODULE_FILE, PACKAGE_HELPER_FILE),
+            expected_relative_id=PACKAGE_HELPER_FILE,
+            expected_type=PROJECT_FILE_TYPE,
         ),
         _ProjectResolutionCase(
             import_str=".service.value",
-            source_file="pkg/module.py",
-            project_files=("pkg/module.py", "pkg/service.py"),
+            source_file=PACKAGE_MODULE_FILE,
+            project_files=(PACKAGE_MODULE_FILE, "pkg/service.py"),
             expected_relative_id="pkg/service.py",
-            expected_type="project_file",
+            expected_type=PROJECT_FILE_TYPE,
         ),
         _ProjectResolutionCase(
             import_str=".",
-            source_file="pkg/module.py",
-            project_files=("pkg/module.py", "pkg/__init__.py"),
-            expected_relative_id="pkg/__init__.py",
-            expected_type="project_file",
+            source_file=PACKAGE_MODULE_FILE,
+            project_files=(PACKAGE_MODULE_FILE, PACKAGE_INIT_FILE),
+            expected_relative_id=PACKAGE_INIT_FILE,
+            expected_type=PROJECT_FILE_TYPE,
         ),
         _ProjectResolutionCase(
             import_str="..helper",
-            source_file="pkg/sub/module.py",
-            project_files=("pkg/sub/module.py", "pkg/helper.py"),
-            expected_relative_id="pkg/helper.py",
-            expected_type="project_file",
+            source_file=SUBPACKAGE_MODULE_FILE,
+            project_files=(SUBPACKAGE_MODULE_FILE, PACKAGE_HELPER_FILE),
+            expected_relative_id=PACKAGE_HELPER_FILE,
+            expected_type=PROJECT_FILE_TYPE,
         ),
         _ProjectResolutionCase(
             import_str="..",
-            source_file="pkg/sub/module.py",
-            project_files=("pkg/sub/module.py", "pkg/__init__.py"),
-            expected_relative_id="pkg/__init__.py",
-            expected_type="project_file",
+            source_file=SUBPACKAGE_MODULE_FILE,
+            project_files=(SUBPACKAGE_MODULE_FILE, PACKAGE_INIT_FILE),
+            expected_relative_id=PACKAGE_INIT_FILE,
+            expected_type=PROJECT_FILE_TYPE,
         ),
         _ProjectResolutionCase(
             import_str="project.pkg.module.ClassName",
-            source_file="main.py",
-            project_files=("main.py", "pkg/module.py"),
-            expected_relative_id="pkg/module.py",
-            expected_type="project_file",
+            source_file=MAIN_FILE,
+            project_files=(MAIN_FILE, PACKAGE_MODULE_FILE),
+            expected_relative_id=PACKAGE_MODULE_FILE,
+            expected_type=PROJECT_FILE_TYPE,
         ),
         _ProjectResolutionCase(
             import_str="project",
-            source_file="main.py",
-            project_files=("main.py", "__init__.py"),
+            source_file=MAIN_FILE,
+            project_files=(MAIN_FILE, "__init__.py"),
             expected_relative_id="__init__.py",
-            expected_type="project_file",
+            expected_type=PROJECT_FILE_TYPE,
         ),
     ],
 )
-def test_resolve_import_string_resolves_project_modules(
+def test_resolve_project_modules(
     tmp_path: Path,
     case: _ProjectResolutionCase,
 ) -> None:
@@ -125,19 +130,19 @@ def test_resolve_import_string_resolves_project_modules(
     [
         _UnresolvedResolutionCase(
             import_str=".missing.value",
-            source_file="pkg/module.py",
-            project_files=("pkg/module.py",),
+            source_file=PACKAGE_MODULE_FILE,
+            project_files=(PACKAGE_MODULE_FILE,),
             expected_type="unresolved_relative",
         ),
         _UnresolvedResolutionCase(
             import_str="....helper",
-            source_file="pkg/sub/module.py",
-            project_files=("pkg/sub/module.py",),
+            source_file=SUBPACKAGE_MODULE_FILE,
+            project_files=(SUBPACKAGE_MODULE_FILE,),
             expected_type="unresolved_relative_too_many_dots",
         ),
     ],
 )
-def test_resolve_import_string_marks_unresolved_relative_imports(
+def test_mark_unresolved_relative_imports(
     tmp_path: Path,
     case: _UnresolvedResolutionCase,
 ) -> None:
@@ -153,7 +158,7 @@ def test_resolve_import_string_marks_unresolved_relative_imports(
     assert resolved == NodeInfo(case.import_str, case.expected_type)
 
 
-def test_resolve_import_string_classifies_stdlib_imports() -> None:
+def test_classify_stdlib_imports() -> None:
     resolved = resolve_import_string(
         "os.path",
         "/virtual/project/main.py",
@@ -164,7 +169,7 @@ def test_resolve_import_string_classifies_stdlib_imports() -> None:
     assert resolved == NodeInfo("os", "std_lib")
 
 
-def test_resolve_import_string_classifies_external_imports() -> None:
+def test_classify_external_imports() -> None:
     resolved = resolve_import_string(
         "requests.sessions",
         "/virtual/project/main.py",
